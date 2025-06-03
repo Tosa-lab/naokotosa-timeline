@@ -74,146 +74,60 @@ body::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
   </div>
 
 <script>
-/* ----------------------------------------------------------------
- * 💾 1) ここを自分のシート ID に置き換えてください
- *      （URL の /d/ と /edit の間の部分）
- * ---------------------------------------------------------------- */
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
-
-/* ----------------------------------------------------------------
- * カテゴリ設定（色・行番号・バー高さ）
- * 行番号 0 が一番上。その下に row-spacing ずつ並びます。
- * ---------------------------------------------------------------- */
-const CATEGORIES = {
-  Works:       {color:"#ff1493", row:0, barH:10},
-  Exhibitions: {color:"#14FF82", row:1, barH:6},
-  Events:      {color:"#880800", row:2, barH:6},
-  Products:    {color:"#ffff00", row:3, barH:6, text:"#000"},
-  Media:       {color:"#0047FF", row:4, barH:6},
-  Essay:       {color:"#660099", row:5, barH:6}
-};
-
-/* ----------------------------------------------------------------
- * 基準年（横軸 1985 – 2026 を想定。必要なら変更）
- * ---------------------------------------------------------------- */
-const FIRST_YEAR = 1985;
-const LAST_YEAR  = 2026;
-
-/* ========== 描画 ========== */
-(async () => {
-  /* fetch → CSV パース（引用符を考慮した簡易 split） */
-  const csv = await (await fetch(CSV_URL)).text();
-  const rows = csv.trim().split(/\r?\n/).map(r =>
-    r.match(/(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|([^,]+)|)(?=,|$)/g)
-     .map(c=>c.replace(/^"|"$/g,'').replace(/""/g,'"')));
-
-  const [header,...items] = rows;          // 1 行目はヘッダー
-  const canvas   = document.getElementById("canvas");
-  const barsRoot = document.getElementById("bars-root");
-  const legend   = document.getElementById("legend");
-
-  /* = legend を生成 = */
-  Object.entries(CATEGORIES).forEach(([cat,{color,barH}])=>{
-    const li    = document.createElement("div");
-    li.className="legend-item";
-    const bar   = document.createElement("span");
-    bar.className="legend-bar";
-    bar.style.background = color;
-    bar.style.height = barH+"px";
-    li.appendChild(bar);
-    li.append(cat);
-    legend.appendChild(li);
-  });
-
-  /* = 各作品バーを生成 = */
-  const gp = parseFloat(getComputedStyle(document.documentElement)
-                        .getPropertyValue("--grid-pitch"));
-  const offX = parseFloat(
-               getComputedStyle(document.documentElement)
-               .getPropertyValue("--grid-offset"));
-  const rowSpacing = parseFloat(
-               getComputedStyle(document.documentElement)
-               .getPropertyValue("--row-spacing"));
-
-  let maxCanvasHeight = 0;
-
-  items.forEach(r=>{
-    const [startY,endY,title,previewURL,linkURL,attr] = r;
-    if(!CATEGORIES[attr]) return;          // 未定義カテゴリは無視
-
-    const cfg = CATEGORIES[attr];
-    const start = +startY;
-    const end   = +endY || start;          // 終了未入力なら 1 年幅
-    const span  = Math.max(1,end-start)*gp;
-
-    const left  = offX + (start-FIRST_YEAR)*gp;
-    const top   = cfg.row * rowSpacing + 120;     // 120px は凡例分の余白
-    const barH  = cfg.barH;
-
-    /* main wrapper */
-    const box = document.createElement("div");
-    box.className="bar-box";
-    box.style.cssText=`left:${left}px;top:${top}px;width:${span}px;height:${barH}px`;
-
-    /* anchor + bar + label */
-    const a   = document.createElement("a");
-    a.href    = linkURL;
-    a.target  = "_blank";
-
-    const bar = document.createElement("div");
-    bar.className="bar";
-    bar.style.cssText=`width:100%;height:100%;background:${cfg.color}`;
-
-    /* label */
-    const lbl = document.createElement("span");
-    lbl.className="label";
-    lbl.style.left = "0px";
-    lbl.style.color = cfg.text || "#fff";
-    lbl.textContent = title;
-
-    a.appendChild(bar);
-    a.appendChild(lbl);
-    box.appendChild(a);
-    barsRoot.appendChild(box);
-
-    /* preview (optional) */
-    if(previewURL){
-      const pv = document.createElement("div");
-      pv.className="preview";
-      const img = new Image();
-      img.src = previewURL;
-      pv.appendChild(img);
-      barsRoot.appendChild(pv);
-      /* hover linking - bar-box:hover + .preview 用の隣接配置 */
-      box.insertAdjacentElement("afterend",pv);
+/* ---------------- 1. 依存しない超簡易 CSV パーサ ---------------- */
+function parseCSV(text){
+  const rows = text.trim().split(/\r?\n/).map(r=>{
+    // 「,」を含むセルは二重引用符で囲う前提：簡易実装
+    const cells = []; let cur = '', inQuote = false;
+    for(const ch of r){
+      if(ch === '"'){ inQuote = !inQuote; continue; }
+      if(ch === ',' && !inQuote){ cells.push(cur); cur=''; continue; }
+      cur += ch;
     }
-
-    maxCanvasHeight = Math.max(maxCanvasHeight, top+rowSpacing);
+    cells.push(cur);
+    return cells.map(c=>c.trim());
   });
+  const header = rows.shift();
+  return rows.map(r=>Object.fromEntries(r.map((v,i)=>[header[i],v])));
+}
 
-  /* = キャンバスの高さを自動調整 = */
-  canvas.style.height = `${maxCanvasHeight}px`;
+/* ---------------- 2. Google Sheets から読み取り ---------------- */
+const CSV_URL =
+ "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
 
-  /* = 年ラベル描画 = */
-  const yearLabels = document.getElementById("year-labels");
-  for(let y=FIRST_YEAR;y<=LAST_YEAR;y++){
-    const x = offX + (y-FIRST_YEAR)*gp;
-    ["top","bottom"].forEach(pos=>{
-      const el = document.createElement("div");
-      el.className="year";
-      el.style.left = x+"px";
-      el.style[pos] = "-40px";
-      el.innerHTML  = `<span>${y}</span>`;
-      yearLabels.appendChild(el);
-    });
-  }
-})();
+fetch(CSV_URL).then(r=>r.text()).then(text=>{
+  const data = parseCSV(text);             // eval を使わず JSON 化
+  buildTimeline(data);                     // ↓3. タイムライン描画
+}).catch(console.error);
+
+/* ---------------- 3. タイムライン描画（従来 JS から移植） -------- */
+function buildTimeline(records){
+  const wrap = document.getElementById('timeline-wrapper');
+  /*  ★必要最低限の DOM を生成する例（横棒と見出しだけ）★
+      - records[i] には
+        { Start, End, Title, TooltipImg, Link, Category }
+        の 6 列が入っている前提
+  */
+  const PITCH = 25;          // 1 年あたりピクセル
+  const OFFSET = 20;         // 1985 の X 座標
+  const START_Y = 1985;
+
+  wrap.style.position='relative';
+  wrap.style.width='1060px'; wrap.style.height='3300px';
+  records.forEach(rec=>{
+    const left = OFFSET + (rec.Start - START_Y)*PITCH;
+    const width= (rec.End - rec.Start || 1)*PITCH;
+    const bar  = document.createElement('a');
+    bar.href = rec.Link; bar.target='_blank';
+    bar.style.cssText = `
+      position:absolute; top:${rec.Category*20}px;
+      left:${left}px; width:${width}px; height:10px;
+      background:${rec.Color||'#ff1493'}; border:1px solid #000;
+    `;
+    bar.title = rec.Title;
+    wrap.appendChild(bar);
+  });
+}
 </script>
 </body>
 </html>
-
-<!-- /wp:html -->
-
-<!-- wp:paragraph -->
-<p></p>
-<!-- /wp:paragraph -->
