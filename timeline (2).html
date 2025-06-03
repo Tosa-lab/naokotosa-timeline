@@ -1,0 +1,219 @@
+<!-- wp:html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<!-- ========== 基本スタイル ========== -->
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.5}
+a{color:inherit;text-decoration:none}
+
+:root{
+  /* === X 軸（年）用スケール */
+  --design-width:1060;      /* 仮想キャンバス幅(px) */
+  --grid-pitch:25;          /* 1 年あたりの幅(px) */
+  --grid-offset:20;         /* 「開始年=1985」の X 座標 */
+  /* === Y 軸（カテゴリ行）用 */
+  --row-spacing:60;         /* 行間隔(px) */
+}
+
+.timeline-scale{
+  position:relative;
+  width:calc(var(--design-width)*1px);
+  /* 高さは JS で自動拡張 */
+  transform-origin:top left;
+  transform:scale(calc(100vw/var(--design-width)));
+}
+
+/* 縦グリッド */
+.grid-lines{
+  position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:repeating-linear-gradient(
+        to right,#444 0,#444 1px,transparent 1px,
+        transparent calc(var(--grid-pitch)*1px));
+  background-position:calc(var(--grid-offset)*1px) 0;
+}
+
+/* 年ラベル */
+.year-labels{position:absolute;inset:0;pointer-events:none}
+.year{position:absolute;font-size:9pt;transform:translateX(-50%)}
+.year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
+
+/* 凡例 */
+.legend{display:flex;flex-direction:column;gap:.6rem;font-size:9pt;padding:1.5rem 0 0 1rem;position:relative;z-index:5}
+.legend-item{display:flex;align-items:center;gap:.5rem;white-space:nowrap}
+.legend-bar{width:25px;height:8px;border:1px solid #000}
+
+/* 各バー */
+.bar-box{position:absolute}
+.bar{border:1px solid #000}
+.label{position:absolute;top:-19px;white-space:nowrap;color:#fff}
+
+/* プレビュー画像（ホバーで表示） */
+.preview{display:none;position:fixed;top:1rem;left:75%;max-width:24%;z-index:999;border-radius:8px;overflow:hidden}
+.preview img{width:100%;display:block}
+.bar-box:hover+.preview{display:block}
+
+/* スクロールバー（横スクロール可） */
+body::-webkit-scrollbar{height:8px}
+body::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
+</style>
+</head>
+
+<body>
+  <div class="timeline-scale" id="canvas">
+    <div class="grid-lines"></div>
+    <div class="year-labels" id="year-labels"></div>
+    <!-- Legend -->
+    <div class="legend" id="legend"></div>
+    <!-- Bars root -->
+    <div id="bars-root"></div>
+  </div>
+
+<script>
+/* ----------------------------------------------------------------
+ * 💾 1) ここを自分のシート ID に置き換えてください
+ *      （URL の /d/ と /edit の間の部分）
+ * ---------------------------------------------------------------- */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
+
+/* ----------------------------------------------------------------
+ * カテゴリ設定（色・行番号・バー高さ）
+ * 行番号 0 が一番上。その下に row-spacing ずつ並びます。
+ * ---------------------------------------------------------------- */
+const CATEGORIES = {
+  Works:       {color:"#ff1493", row:0, barH:10},
+  Exhibitions: {color:"#14FF82", row:1, barH:6},
+  Events:      {color:"#880800", row:2, barH:6},
+  Products:    {color:"#ffff00", row:3, barH:6, text:"#000"},
+  Media:       {color:"#0047FF", row:4, barH:6},
+  Essay:       {color:"#660099", row:5, barH:6}
+};
+
+/* ----------------------------------------------------------------
+ * 基準年（横軸 1985 – 2026 を想定。必要なら変更）
+ * ---------------------------------------------------------------- */
+const FIRST_YEAR = 1985;
+const LAST_YEAR  = 2026;
+
+/* ========== 描画 ========== */
+(async () => {
+  /* fetch → CSV パース（引用符を考慮した簡易 split） */
+  const csv = await (await fetch(CSV_URL)).text();
+  const rows = csv.trim().split(/\r?\n/).map(r =>
+    r.match(/(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|([^,]+)|)(?=,|$)/g)
+     .map(c=>c.replace(/^"|"$/g,'').replace(/""/g,'"')));
+
+  const [header,...items] = rows;          // 1 行目はヘッダー
+  const canvas   = document.getElementById("canvas");
+  const barsRoot = document.getElementById("bars-root");
+  const legend   = document.getElementById("legend");
+
+  /* = legend を生成 = */
+  Object.entries(CATEGORIES).forEach(([cat,{color,barH}])=>{
+    const li    = document.createElement("div");
+    li.className="legend-item";
+    const bar   = document.createElement("span");
+    bar.className="legend-bar";
+    bar.style.background = color;
+    bar.style.height = barH+"px";
+    li.appendChild(bar);
+    li.append(cat);
+    legend.appendChild(li);
+  });
+
+  /* = 各作品バーを生成 = */
+  const gp = parseFloat(getComputedStyle(document.documentElement)
+                        .getPropertyValue("--grid-pitch"));
+  const offX = parseFloat(
+               getComputedStyle(document.documentElement)
+               .getPropertyValue("--grid-offset"));
+  const rowSpacing = parseFloat(
+               getComputedStyle(document.documentElement)
+               .getPropertyValue("--row-spacing"));
+
+  let maxCanvasHeight = 0;
+
+  items.forEach(r=>{
+    const [startY,endY,title,previewURL,linkURL,attr] = r;
+    if(!CATEGORIES[attr]) return;          // 未定義カテゴリは無視
+
+    const cfg = CATEGORIES[attr];
+    const start = +startY;
+    const end   = +endY || start;          // 終了未入力なら 1 年幅
+    const span  = Math.max(1,end-start)*gp;
+
+    const left  = offX + (start-FIRST_YEAR)*gp;
+    const top   = cfg.row * rowSpacing + 120;     // 120px は凡例分の余白
+    const barH  = cfg.barH;
+
+    /* main wrapper */
+    const box = document.createElement("div");
+    box.className="bar-box";
+    box.style.cssText=`left:${left}px;top:${top}px;width:${span}px;height:${barH}px`;
+
+    /* anchor + bar + label */
+    const a   = document.createElement("a");
+    a.href    = linkURL;
+    a.target  = "_blank";
+
+    const bar = document.createElement("div");
+    bar.className="bar";
+    bar.style.cssText=`width:100%;height:100%;background:${cfg.color}`;
+
+    /* label */
+    const lbl = document.createElement("span");
+    lbl.className="label";
+    lbl.style.left = "0px";
+    lbl.style.color = cfg.text || "#fff";
+    lbl.textContent = title;
+
+    a.appendChild(bar);
+    a.appendChild(lbl);
+    box.appendChild(a);
+    barsRoot.appendChild(box);
+
+    /* preview (optional) */
+    if(previewURL){
+      const pv = document.createElement("div");
+      pv.className="preview";
+      const img = new Image();
+      img.src = previewURL;
+      pv.appendChild(img);
+      barsRoot.appendChild(pv);
+      /* hover linking - bar-box:hover + .preview 用の隣接配置 */
+      box.insertAdjacentElement("afterend",pv);
+    }
+
+    maxCanvasHeight = Math.max(maxCanvasHeight, top+rowSpacing);
+  });
+
+  /* = キャンバスの高さを自動調整 = */
+  canvas.style.height = `${maxCanvasHeight}px`;
+
+  /* = 年ラベル描画 = */
+  const yearLabels = document.getElementById("year-labels");
+  for(let y=FIRST_YEAR;y<=LAST_YEAR;y++){
+    const x = offX + (y-FIRST_YEAR)*gp;
+    ["top","bottom"].forEach(pos=>{
+      const el = document.createElement("div");
+      el.className="year";
+      el.style.left = x+"px";
+      el.style[pos] = "-40px";
+      el.innerHTML  = `<span>${y}</span>`;
+      yearLabels.appendChild(el);
+    });
+  }
+})();
+</script>
+</body>
+</html>
+
+<!-- /wp:html -->
+
+<!-- wp:paragraph -->
+<p></p>
+<!-- /wp:paragraph -->
