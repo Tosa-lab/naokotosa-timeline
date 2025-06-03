@@ -3,119 +3,167 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Timeline</title>
+<title>Naoko Tosa Timeline</title>
 
 <style>
-/* ==========  基本スタイル（そのままコピペ） ========== */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.5}
+body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.4;overflow-x:auto}
 a{color:inherit;text-decoration:none}
-:root{ --design-width:1060; --grid-pitch:25; --grid-offset:20; --row-spacing:60;}
-.timeline-scale{position:relative;width:calc(var(--design-width)*1px);transform-origin:top left;
-  transform:scale(calc(100vw/var(--design-width)));}
-.grid-lines{position:absolute;inset:0;pointer-events:none;z-index:0;
-  background-image:repeating-linear-gradient(to right,#444 0,#444 1px,transparent 1px,
-        transparent calc(var(--grid-pitch)*1px));
-  background-position:calc(var(--grid-offset)*1px) 0;}
-.year-labels{position:absolute;inset:0;pointer-events:none}
+
+:root{
+  /* 仮想キャンバス幅（X 方向 = 年）と 1 年ピッチ */
+  --canvas-w:1060;           /* px */
+  --pitch:25;                /* px / year */
+  --x-offset:20;             /* 1985年 の X */
+  /* 行ピッチ（Y 方向 = カテゴリ） */
+  --row-h:30;                /* 1 行高さ */
+}
+/* ===== ラッパ ===== */
+#timeline-wrapper{
+  position:relative;
+  width:calc(var(--canvas-w)*1px);
+  /* 高さは JS が自動で拡張 */
+  transform-origin:top left;
+  transform:scale(calc(min(100vw,1200px)/var(--canvas-w)));
+}
+
+/* ===== グリッド & 年ラベル ===== */
+.grid{position:absolute;inset:0;pointer-events:none}
+.grid-lines{
+  height:100%;width:100%;
+  background-image:repeating-linear-gradient(
+       to right,#444 0,#444 1px,transparent 1px,
+       transparent calc(var(--pitch)*1px));
+  background-position:calc(var(--x-offset)*1px) 0;
+}
 .year{position:absolute;font-size:9pt;transform:translateX(-50%)}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
+
+/* ===== 凡例 ===== */
+#legend{display:flex;flex-direction:column;gap:.5rem;font-size:9pt;padding:1rem 0 0 1rem}
+
+/* ===== バー ===== */
 .bar-box{position:absolute}
-.bar{border:1px solid #000}
-.label{position:absolute;top:-19px;white-space:nowrap;color:#fff;font-size:9pt}
-.preview{display:none;position:fixed;top:1rem;left:75%;max-width:24%;z-index:999;border-radius:8px;overflow:hidden}
+.bar{border:1px solid #000;height:10px}
+.lbl{position:absolute;top:-19px;white-space:nowrap;color:#fff;font-size:9pt}
+
+/* ===== プレビュー画像 ===== */
+.preview{display:none;position:fixed;top:1rem;left:70%;max-width:24%;z-index:999;border-radius:8px;overflow:hidden}
 .preview img{width:100%;display:block}
 .bar-box:hover+.preview{display:block}
-body::-webkit-scrollbar{height:8px}
-body::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
+
+/* ===== スクロールバー ===== */
+::-webkit-scrollbar{height:8px}
+::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
 </style>
 </head>
-
 <body>
-  <!-- タイムライン全体を入れる親要素 -->
-  <div class="timeline-scale" id="timeline-wrapper">
+
+<div id="timeline-wrapper">
+  <div class="grid">
     <div class="grid-lines"></div>
-    <div class="year-labels" id="year-labels"></div>
+    <div id="year-labels"></div>
   </div>
+  <div id="legend"></div>
+  <div id="bars-root"></div>
+</div>
 
 <script>
-/* ---------- 1. 改行・カンマだけで読む簡易 CSV パーサ (eval 不使用) ---------- */
-function parseCSV(text){
-  const rows = text.trim().split(/\r?\n/).map(r=>{
-    const out=[], c=[]; let q=false;
+/* ---------------- 1. CSV を JSON に変換（eval 不使用） ---------------- */
+function parseCSV(txt){
+  const rows = txt.trim().split(/\r?\n/).map(r=>{
+    const out=[], q=/""/g; let cur="",inQ=false;
     for(let i=0;i<r.length;i++){
       const ch=r[i];
-      if(ch==='"'){ q=!q; continue;}
-      if(ch===','&&!q){ out.push(c.join('')); c.length=0; continue;}
-      c.push(ch);
+      if(ch==='"'){inQ=!inQ;continue;}
+      if(ch===','&&!inQ){out.push(cur);cur="";continue;}
+      cur+=ch;
     }
-    out.push(c.join(''));
-    return out;
+    out.push(cur);
+    return out.map(c=>c.replace(q,'"').trim());
   });
   const head=rows.shift();
   return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i],v])));
 }
 
-/* ---------- 2. Google Sheets CSV を取得 ---------- */
-const CSV_URL ="https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
+/* ---------------- 2. Google Sheets (公開 CSV) を取得 ---------------- */
+const CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
 
-fetch(CSV_URL).then(r=>r.text()).then(text=>{
-  buildTimeline(parseCSV(text));
-}).catch(console.error);
+fetch(CSV_URL).then(r=>r.text()).then(csv=>{
+  const records=parseCSV(csv);
+  buildTimeline(records);
+}).catch(err=>console.error('CSV 読み込み失敗',err));
 
-/* ---------- 3. 描画ロジック（eval 不使用） ---------- */
+/* ---------------- 3. タイムライン描画 ---------------- */
 function buildTimeline(records){
-  const wrap=document.getElementById('timeline-wrapper');
-  const years=document.getElementById('year-labels');
-  const PITCH=25, OFFSET=20, START=1985;
+  /* === 3-1. カテゴリ→行番号 / 色 の決定 === */
+  const cats=[...new Set(records.map(r=>r.Category))];
+  const catRow=Object.fromEntries(cats.map((c,i)=>[c,i]));
+  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50'];
+  const catColor=Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
 
-  /* --- 年目盛 --- */
-  const END=Math.max(...records.map(r=>+r.End||+r.Start));
-  for(let y=START;y<=END;y++){
-    const x=OFFSET+(y-START)*PITCH;
-    ['top','bottom'].forEach(pos=>{
-      const div=document.createElement('div');
-      div.className='year'; div.style.left=x+'px';
-      div.style[pos]='-40px'; div.innerHTML=`<span>${y}</span>`;
-      years.appendChild(div);
-    });
+  /* === 3-2. 凡例描画 === */
+  const legend=document.getElementById('legend');
+  cats.forEach(c=>{
+    const line=document.createElement('div');
+    line.className='legend-item';
+    line.innerHTML=`<span class="legend-bar" style="background:${catColor[c]}"></span>${c}`;
+    legend.appendChild(line);
+  });
+
+  /* === 3-3. 年ラベル + 縦棒 === */
+  const yLabels=document.getElementById('year-labels');
+  const FROM=1985,TO=2030;
+  for(let y=FROM;y<=TO;y++){
+    const x=+getComputedStyle(document.documentElement)
+              .getPropertyValue('--x-offset').trim().replace('px','')
+            +(y-FROM)*+getComputedStyle(document.documentElement)
+              .getPropertyValue('--pitch').trim().replace('px','');
+    const lbl=document.createElement('div');
+    lbl.className='year';lbl.style.left=x+'px';
+    lbl.innerHTML=`<span>${y}</span>`;
+    yLabels.appendChild(lbl);
   }
 
-  /* --- バー --- */
+  /* === 3-4. バー描画 === */
+  const root=document.getElementById('bars-root');
+  const pitch=parseInt(getComputedStyle(document.documentElement)
+                        .getPropertyValue('--pitch'));
+  const offset=parseInt(getComputedStyle(document.documentElement)
+                         .getPropertyValue('--x-offset'));
+  const rowH=parseInt(getComputedStyle(document.documentElement)
+                       .getPropertyValue('--row-h'));
+  let maxRow=0;
+
   records.forEach(r=>{
-    const s=+r.Start,e=+r.End||s;                 // 数値化
-    const row=parseInt(r.Category)||0;
-    const left = OFFSET+(s-START)*PITCH;
-    const width= (e-s||1)*PITCH;
-    const box = document.createElement('div');
+    const s=Number(r.Start),e=Number(r.End)||s;          // 単年なら End 未入力可
+    const left=offset+(s-1985)*pitch;
+    const width=Math.max((e-s||1)*pitch,4);             // 幅 0 防止
+    const top=catRow[r.Category]*rowH;
+    maxRow=Math.max(maxRow,catRow[r.Category]);
+
+    /* バー + ラベル */
+    const box=document.createElement('div');
     box.className='bar-box';
-    box.style.cssText=`left:${left}px;top:${row*60}px`;
+    box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
+    box.innerHTML=`
+      <a class="bar" href="${r.Link}" target="_blank"
+         style="display:block;height:10px;background:${catColor[r.Category]}"></a>
+      <span class="lbl" style="left:-${Math.min(180,left)}px">${r.Title}</span>`;
+    root.appendChild(box);
 
-    const bar=document.createElement('a');
-    bar.href=r.Link||'#'; bar.target='_blank';
-    bar.className='bar';
-    bar.style.cssText=`display:block;width:${width}px;height:10px;
-       background:${r.Color||'#ff1493'}`;
-    box.appendChild(bar);
-
-    const lab=document.createElement('span');
-    lab.className='label'; lab.textContent=r.Title||'';
-    box.appendChild(lab);
-
-    wrap.appendChild(box);
-
-    /* プレビュー画像 (任意) */
+    /* プレビュー */
     if(r.TooltipImg){
       const prev=document.createElement('div');
       prev.className='preview';
-      prev.innerHTML=`<img loading="lazy" src="${r.TooltipImg}">`;
+      prev.innerHTML=`<img src="${r.TooltipImg}" loading="lazy">`;
       box.after(prev);
     }
   });
 
-  /* --- ラッパー高さを自動調整 --- */
-  const rows=Math.max(...records.map(r=>parseInt(r.Category)||0))+1;
-  wrap.style.height=rows*60+120+'px';
+  /* === 3-5. ラッパ高さを自動拡張 === */
+  document.getElementById('timeline-wrapper').style.height=
+      (maxRow+1)*rowH+80+'px';   // 80 = 余白
 }
 </script>
 </body>
