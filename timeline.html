@@ -13,9 +13,10 @@ a{color:inherit;text-decoration:none}
 :root{
   /* 仮想キャンバス: 幅=1060px ／ 1 年=25px ／ 1985 年の X=20px */
   --W:1060; --PITCH:25; --X0:20;
-  /* 行ピッチ・凡例高さ */
-  --ROW:60; --LEGEND-H:140;
+  /* 凡例ボックスの高さ */
+  --LEGEND-H:140;
 }
+
 #canvas{
   position:relative;
   width:calc(var(--W)*1px);
@@ -35,18 +36,26 @@ a{color:inherit;text-decoration:none}
 .year{position:absolute;font-size:9pt;transform:translateX(-50%)}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
 
-/* 凡例 */
-#legend{position:absolute;top:0;left:0;display:flex;flex-direction:column;
-        gap:.7rem;font-size:9pt;padding:1.2rem}
-.leg-bar{width:25px;height:8px;border:1px solid #000;margin-right:.4rem}
+/* --------- 修正版 LEGEND --------- */
+#legend{
+  position:fixed;          /* スケールの影響を受けない */
+  top:1rem;left:1rem;
+  display:flex;flex-direction:column;gap:.4rem;
+  font-size:9pt;
+  padding:1rem 1.2rem;
+  background:#111e;backdrop-filter:blur(4px);
+  border:1px solid #333;border-radius:8px;
+  z-index:9999;            /* ホバー画像より手前に出す */
+}
+.leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
 
 /* バー + ラベル */
 .bar-box{position:absolute;font-size:9pt}
 .bar{display:block;height:10px;border:1px solid #000}
-.lbl{position:absolute;top:-19px;white-space:nowrap}
+.lbl{position:absolute;top:-19px;white-space:nowrap;color:#fff}
 
 /* ホバー時プレビュー */
-.preview{display:none;position:fixed;top:1rem;left:72%;max-width:24%;
+.preview{display:none;position:fixed;top:1rem;right:1rem;max-width:24%;
          z-index:999;border-radius:8px;overflow:hidden}
 .preview img{width:100%;display:block}
 .bar-box:hover+.preview{display:block}
@@ -58,18 +67,21 @@ a{color:inherit;text-decoration:none}
 </head>
 <body>
 
+<!-- キャンバス本体 -->
 <div id="canvas">
   <div class="grid"></div>
   <div id="years"></div>
-  <div id="legend"></div>
   <div id="bars"></div>
 </div>
+
+<!-- スケールの影響受けない凡例をキャンバス外に配置 -->
+<div id="legend"></div>
 
 <script>
 /* ---------- 1. CSV → JSON ---------- */
 function csv2json(txt){
   const rows = txt.trim().split(/\r?\n/).map(r=>{
-    const out=[], cell=[]; let q=false;           /* ★ 修正: let */
+    const out=[], cell=[]; let q=false;
     for(let i=0;i<r.length;i++){
       const c=r[i];
       if(c==='"'){ q=!q; continue; }
@@ -92,50 +104,59 @@ fetch(CSV + '&t=' + Date.now())
 
 /* ---------- 3. タイムライン描画 ---------- */
 function draw(data){
-  /* カテゴリ → 行番号 & 色 */
+  /* カテゴリ → 色だけ定義（行は使わない） */
   const cats = [...new Set(data.map(r=>r.Category))];
-  const catRow = Object.fromEntries(cats.map((c,i)=>[c,i]));
-  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
+  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff',
+                 '#660099','#ff7f50','#ffa500'];
   const catCol = Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
 
-  /* 凡例 */
+  /* -------- LEGEND -------- */
   const leg = document.getElementById('legend');
   cats.forEach(c=>{
     const div = document.createElement('div');
+    div.style.display='flex'; div.style.alignItems='center';
     div.innerHTML = `<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
     leg.appendChild(div);
   });
 
-  /* 年ラベル + 縦棒 */
+  /* -------- 年ラベル & グリッド -------- */
   const ys = document.getElementById('years');
   const P = +getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
   const X0= +getComputedStyle(document.documentElement).getPropertyValue('--X0');
   const FROM = 1985;
-  const TO = Math.max(...data.map(r=>+r.End||+r.Start), 2026);
+  const TO = Math.max(...data.map(r=>+r.End||+r.Start), new Date().getFullYear()+1);
+
   for(let y=FROM; y<=TO; y++){
     const x = X0 + (y - FROM) * P;
     ['top','bottom'].forEach(pos=>{
       const e = document.createElement('div');
-      e.className='year'; e.style.left=x+'px'; e.style[pos]='-36px';
+      e.className='year'; e.style.left=`${x}px`; e.style[pos]='-36px';
       e.innerHTML=`<span>${y}</span>`;
       ys.appendChild(e);
     });
   }
 
-  /* バー */
+  /* -------- バー（縦位置=年ベース） -------- */
   const bars = document.getElementById('bars');
-  const ROW = +getComputedStyle(document.documentElement).getPropertyValue('--ROW');
+  const LEG_H = parseInt(getComputedStyle(document.documentElement)
+                        .getPropertyValue('--LEGEND-H'),10);
+
   data.forEach(r=>{
-    const s=+r.Start, e=+r.End||s, row=catRow[r.Category];
-    const left=X0+(s-1985)*P, width=Math.max((e-s||1)*P,4);
+    const s = +r.Start;
+    const e = +r.End || s;
+    const left  = X0 + (s - FROM) * P;
+    const width = Math.max((e - s || 1) * P, 4);
+    /* 年が新しいほど上に（TO - 年）で逆順） */
+    const top   = LEG_H + (TO - s) * P;
+
     const box=document.createElement('div');
     box.className='bar-box';
-    box.style.cssText=`left:${left}px;top:${row*ROW+parseInt(getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H'))}px;width:${width}px`;
+    box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
     box.innerHTML=`
       <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>
-      <span class="lbl" style="left:-${Math.min(160,left)}px">${r.Title}</span>`;
+      <span class="lbl">${r.Title}</span>`;
     bars.appendChild(box);
 
     if(r.TooltipImg){
@@ -146,9 +167,9 @@ function draw(data){
     }
   });
 
-  /* キャンバス高さ調整 */
+  /* キャンバス全体の高さを年数分確保 */
   document.getElementById('canvas').style.height =
-      (cats.length * ROW + 200) + 'px';
+      (LEG_H + (TO - FROM + 2) * P) + 'px';
 }
 </script>
 </body>
