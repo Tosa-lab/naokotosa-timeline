@@ -3,20 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Naoko Tosa Timeline</title>
+<title>Naoko Tosa Timeline – no‑overlap version</title>
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.45;overflow-x:auto}
 a{color:inherit;text-decoration:none}
 
+/* ------- カスタムプロパティ ------- */
 :root{
-  /* キャンバス設定: 幅 / 1 年あたりピッチ / 基準 X */
-  --W:1060;      /* px */
-  --PITCH:25;    /* 1 年 = 25 px */
-  --X0:20;       /* 1985 年の X 座標(px) */
-  /* 凡例ボックスの高さ */
-  --LEGEND-H:140;
+  --W:1060;        /* 全幅(px) */
+  --PITCH:25;      /* 1 年 = 25 px */
+  --X0:20;         /* 1985 年の X 座標 */
+  --LEGEND-H:140;  /* 凡例ボックス高さ */
+  --ROW-H:20;      /* 1 行の高さ (=バーの高さ) */
+  --ROW-GAP:6;     /* 行間 */
 }
 
 #canvas{
@@ -38,31 +39,28 @@ a{color:inherit;text-decoration:none}
 .year{position:absolute;font-size:9pt;transform:translateX(-50%)}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
 
-/* -------- 固定表示の凡例 -------- */
+/* -------- 凡例 -------- */
 #legend{
-  position:fixed;          /* キャンバスの scale 影響を受けない */
-  top:1rem;left:1rem;
+  position:fixed;top:1rem;left:1rem;
   display:flex;flex-direction:column;gap:.4rem;
   font-size:9pt;
   padding:1rem 1.2rem;
   background:#111e;backdrop-filter:blur(4px);
-  border:1px solid #333;border-radius:8px;
-  z-index:9999;
+  border:1px solid #333;border-radius:8px;z-index:9999;
 }
 .leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
 
-/* バー & ラベル */
+/* -------- バー -------- */
 .bar-box{position:absolute;font-size:9pt}
 .bar{display:block;height:10px;border:1px solid #000}
 .lbl{position:absolute;top:-19px;white-space:nowrap;color:#fff}
 
-/* ホバー時プレビュー */
-.preview{display:none;position:fixed;top:1rem;right:1rem;max-width:24%;
-         z-index:999;border-radius:8px;overflow:hidden}
+/* -------- プレビュー -------- */
+.preview{display:none;position:fixed;top:1rem;right:1rem;max-width:24%;z-index:999;border-radius:8px;overflow:hidden}
 .preview img{width:100%;display:block}
 .bar-box:hover+.preview{display:block}
 
-/* スクロールバー美化（Chrome） */
+/* Scrollbar (Chrome) */
 ::-webkit-scrollbar{height:8px}
 ::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
 </style>
@@ -76,7 +74,7 @@ a{color:inherit;text-decoration:none}
   <div id="bars"></div>
 </div>
 
-<!-- 凡例（固定） -->
+<!-- 凡例 -->
 <div id="legend"></div>
 
 <script>
@@ -97,82 +95,88 @@ function csv2json(txt){
   return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i],v.trim()])));
 }
 
-/* ---------- 2. Sheets 公開 CSV を取得 (キャッシュ回避) ---------- */
+/* ---------- 2. CSV 取得 ---------- */
 const CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
-fetch(CSV + '&t=' + Date.now())
-  .then(r => r.text())
-  .then(txt => draw(csv2json(txt)))
-  .catch(err => console.error('CSV 読み込み失敗', err));
+fetch(CSV+'&t='+Date.now())
+  .then(r=>r.text())
+  .then(txt=>draw(csv2json(txt)))
+  .catch(err=>console.error('CSV 読み込み失敗',err));
 
 /* ---------- 3. タイムライン描画 ---------- */
 function draw(data){
-  /* カテゴリ → 色だけ定義 */
-  const cats = [...new Set(data.map(r=>r.Category))];
+  /* --- カテゴリ → 色 --- */
+  const cats=[...new Set(data.map(r=>r.Category))];
   const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff',
                  '#660099','#ff7f50','#ffa500'];
-  const catCol = Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
+  const catCol=Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
 
-  /* -------- 凡例 -------- */
-  const leg = document.getElementById('legend');
+  /* --- 凡例 --- */
+  const leg=document.getElementById('legend');
   cats.forEach(c=>{
-    const div = document.createElement('div');
-    div.style.display='flex'; div.style.alignItems='center';
-    div.innerHTML = `<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
+    const div=document.createElement('div');
+    div.style.display='flex';div.style.alignItems='center';
+    div.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
     leg.appendChild(div);
   });
 
-  /* -------- 年ラベル & グリッド -------- */
-  const ys   = document.getElementById('years');
-  const P    = +getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
-  const X0   = +getComputedStyle(document.documentElement).getPropertyValue('--X0');
-  const FROM = 1985;
-  const TO   = Math.max(...data.map(r=>+r.End||+r.Start), new Date().getFullYear()+1);
-
-  for(let y=FROM; y<=TO; y++){
-    const x = X0 + (y - FROM) * P;
+  /* --- 年ラベル & グリッド --- */
+  const ys=document.getElementById('years');
+  const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
+  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
+  const FROM=1985;
+  const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
+  for(let y=FROM;y<=TO;y++){
+    const x=X0+(y-FROM)*P;
     ['top','bottom'].forEach(pos=>{
-      const e = document.createElement('div');
+      const e=document.createElement('div');
       e.className='year';
-      e.style.left = `${x}px`;
-      e.style[pos] = '-36px';
-      e.innerHTML  = `<span>${y}</span>`;
+      e.style.left=`${x}px`;
+      e.style[pos]='-36px';
+      e.innerHTML=`<span>${y}</span>`;
       ys.appendChild(e);
     });
   }
 
-  /* -------- バー -------- */
-  const bars  = document.getElementById('bars');
-  const LEG_H = parseInt(getComputedStyle(document.documentElement)
-                         .getPropertyValue('--LEGEND-H'),10);
+  /* --- ノーオーバーラップ配置 --- */
+  const bars=document.getElementById('bars');
+  const LEG_H=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H'),10);
+  const ROW_H=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ROW-H'),10);
+  const GAP  =parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP'),10);
 
-  /* 年ごとのスタック数をカウント */
-  const yearCount = Object.create(null);  // { 2020: 0, 2021: 2, ... }
-  let   maxIdx    = 0;                   // 最大スタック数 (高さ計算用)
+  /* 行 (lane) ごとの “終端X” を覚えておく */
+  const lanesEndX=[];
+  /* 開始年 → 終了年が早い順で安定ソート */
+  data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start) - (+b.End||+b.Start));
 
   data.forEach(r=>{
-    const s = +r.Start;
-    const e = +r.End || s;
+    const s=+r.Start;
+    const e=+r.End||s;
+    const left =X0+(s-FROM)*P;
+    const width=Math.max((e-s||1)*P,4);
+    const right=left+width;
 
-    /* 同一年の n 番目 (0-based) */
-    const idx = (yearCount[s] = (yearCount[s]||0) + 1) - 1;
-    if(idx > maxIdx) maxIdx = idx;
+    /* 1) ぶつからない行を探す */
+    let lane=lanesEndX.findIndex(x=>x<=left-2); // -2px のゆとり
+    if(lane===-1){             /* 2) 全滅なら新行を増設 */
+      lane=lanesEndX.length;
+      lanesEndX.push(0);
+    }
+    /* 3) 行の“占有終端”を更新 */
+    lanesEndX[lane]=right;
 
-    const left  = X0 + (s - FROM) * P;
-    const width = Math.max((e - s || 1) * P, 4);
-    /* 45° 右上がりベース + 年度スタック分 (P ずつ) */
-    const top   = LEG_H + (TO - s) * P + idx * P;
+    /* 4) 描画 */
+    const top=LEG_H+lane*(ROW_H+GAP);
+    const box=document.createElement('div');
+    box.className='bar-box';
+    box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
-    const box = document.createElement('div');
-    box.className = 'bar-box';
-    box.style.cssText = `left:${left}px;top:${top}px;width:${width}px`;
-
-    box.innerHTML = `
+    box.innerHTML=`
       <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>
       <span class="lbl">${r.Title}</span>`;
     bars.appendChild(box);
 
-    /* 画像プレビュー */
+    /* プレビュー */
     if(r.TooltipImg){
       const pv=document.createElement('div');
       pv.className='preview';
@@ -181,9 +185,9 @@ function draw(data){
     }
   });
 
-  /* -------- キャンバス高さ調整 -------- */
-  document.getElementById('canvas').style.height =
-      (LEG_H + (TO - FROM + 2 + maxIdx) * P) + 'px';
+  /* --- キャンバス高さを行数で決定 --- */
+  document.getElementById('canvas').style.height=
+      LEG_H+lanesEndX.length*(ROW_H+GAP)+'px';
 }
 </script>
 </body>
