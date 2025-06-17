@@ -1,84 +1,137 @@
-<!DOCTYPE html><html lang="ja"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Naoko Tosa Timeline – staircase</title>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Naoko Tosa Timeline – staircase & hover‑preview</title>
+
 <style>
+/* 基本リセット */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.45;overflow-x:auto}
 a{color:inherit;text-decoration:none}
+
 /* -------- 変数 -------- */
 :root{
-  --W:1060; --PITCH:25; --X0:20; --LEGEND-H:140;
-  --ROW-H:20; --ROW-GAP:6;
+  --W:1060;        /* 全幅(px) */
+  --PITCH:25;      /* 1 年 = 25 px */
+  --X0:20;         /* 1985 年の X 座標 */
+  --LEGEND-H:140;  /* 凡例ボックス高さ */
+  --ROW-H:20;      /* 1 行の高さ（バー高さ）*/
+  --ROW-GAP:6;     /* 行間 */
 }
-#canvas{position:relative;width:calc(var(--W)*1px);
+
+#canvas{
+  position:relative;
+  width:calc(var(--W)*1px);
   transform-origin:top left;
   transform:scale(calc(min(100vw,1200px)/var(--W)));
 }
+
 /* 縦グリッド & 年ラベル */
 .grid{position:absolute;inset:0;pointer-events:none;z-index:0}
-.grid::before{content:"";display:block;height:100%;
+.grid::before{
+  content:"";display:block;height:100%;
   background-image:repeating-linear-gradient(
        to right,#444 0,#444 1px,transparent 1px,
        transparent calc(var(--PITCH)*1px));
-  background-position:calc(var(--X0)*1px) 0;}
+  background-position:calc(var(--X0)*1px) 0;
+}
 .year{position:absolute;font-size:9pt;transform:translateX(-50%)}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
-/* 凡例 */
-#legend{position:fixed;top:1rem;left:1rem;display:flex;flex-direction:column;gap:.4rem;
-  font-size:9pt;padding:1rem 1.2rem;background:#111e;backdrop-filter:blur(4px);
-  border:1px solid #333;border-radius:8px;z-index:9999;}
+
+/* -------- 凡例 -------- */
+#legend{
+  position:fixed;top:1rem;left:1rem;
+  display:flex;flex-direction:column;gap:.4rem;
+  font-size:9pt;
+  padding:1rem 1.2rem;
+  background:#111e;backdrop-filter:blur(4px);
+  border:1px solid #333;border-radius:8px;z-index:9999;
+}
 .leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
-/* バー */
+
+/* -------- バー -------- */
 .bar-box{position:absolute;font-size:9pt}
 .bar{display:block;height:10px;border:1px solid #000}
 .lbl{position:absolute;top:-19px;white-space:nowrap;color:#fff}
-/* プレビュー */
-.preview{display:none;position:fixed;top:1rem;right:1rem;max-width:24%;z-index:999;
-  border-radius:8px;overflow:hidden}
-.preview img{width:100%;display:block}
-.bar-box:hover+.preview{display:block}
-/* scrollbar */
-::-webkit-scrollbar{height:8px}::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
-</style></head><body>
 
-<div id="canvas"><div class="grid"></div><div id="years"></div><div id="bars"></div></div>
+/* -------- プレビュー画像 -------- */
+.preview{
+  display:none;
+  position:absolute;            /* 親(.bar-box) を基準に配置 */
+  left:calc(100% + 8px);        /* バーの右隣に 8 px 余白 */
+  top:50%; transform:translateY(-50%);
+  max-width:220px;              /* 必要に応じて調整 */
+  z-index:999;
+  border-radius:8px;overflow:hidden;
+  pointer-events:none;          /* マウス判定を透過 */
+}
+.preview img{width:100%;display:block}
+
+/* Hover：子孫セレクタで表示 */
+.bar-box:hover .preview{display:block}
+
+/* スクロールバー（Chrome）*/
+::-webkit-scrollbar{height:8px}
+::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
+</style>
+</head>
+<body>
+
+<!-- メインキャンバス -->
+<div id="canvas">
+  <div class="grid"></div>
+  <div id="years"></div>
+  <div id="bars"></div>
+</div>
+
+<!-- 凡例 -->
 <div id="legend"></div>
 
 <script>
-/* ----- CSV → JSON ----- */
+/* ---------- 1. CSV → JSON ---------- */
 function csv2json(txt){
-  const rows=txt.trim().split(/\r?\n/).map(r=>{
-    const out=[],cell=[];let q=false;
+  const rows = txt.trim().split(/\r?\n/).map(r=>{
+    const out=[], cell=[]; let q=false;
     for(let i=0;i<r.length;i++){
       const c=r[i];
-      if(c==='"'){q=!q;continue;}
-      if(c===','&&!q){out.push(cell.join(''));cell.length=0;continue;}
+      if(c==='"'){ q=!q; continue; }
+      if(c===',' && !q){ out.push(cell.join('')); cell.length=0; continue; }
       cell.push(c);
     }
     out.push(cell.join(''));
     return out;
   });
-  const head=rows.shift();
+  const head = rows.shift();
   return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i],v.trim()])));
 }
-/* ----- Sheets CSV 読込 ----- */
-const CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
-fetch(CSV+'&t='+Date.now()).then(r=>r.text()).then(t=>draw(csv2json(t)))
-  .catch(e=>console.error('CSV 読み込み失敗',e));
-/* ----- 描画 ----- */
+
+/* ---------- 2. CSV 取得 ---------- */
+const CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
+fetch(CSV+'&t='+Date.now())
+  .then(r=>r.text())
+  .then(txt=>draw(csv2json(txt)))
+  .catch(err=>console.error('CSV 読み込み失敗',err));
+
+/* ---------- 3. タイムライン描画 ---------- */
 function draw(data){
-  /* カテゴリ → 色 */
+  /* --- カテゴリ → 色 --- */
   const cats=[...new Set(data.map(r=>r.Category))];
-  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
+  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff',
+                 '#660099','#ff7f50','#ffa500'];
   const catCol=Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
-  /* 凡例 */
+
+  /* --- 凡例 --- */
   const leg=document.getElementById('legend');
   cats.forEach(c=>{
-    const d=document.createElement('div');d.style.display='flex';d.style.alignItems='center';
-    d.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
-    leg.appendChild(d);
+    const div=document.createElement('div');
+    div.style.display='flex';div.style.alignItems='center';
+    div.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
+    leg.appendChild(div);
   });
-  /* 年ラベル */
+
+  /* --- 年ラベル & グリッド --- */
   const ys=document.getElementById('years');
   const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
   const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
@@ -87,36 +140,75 @@ function draw(data){
   for(let y=FROM;y<=TO;y++){
     const x=X0+(y-FROM)*P;
     ['top','bottom'].forEach(pos=>{
-      const e=document.createElement('div');e.className='year';e.style.left=`${x}px`;
-      e.style[pos]='-36px';e.innerHTML=`<span>${y}</span>`;ys.appendChild(e);
+      const e=document.createElement('div');
+      e.className='year';
+      e.style.left=`${x}px`;
+      e.style[pos]='-36px';
+      e.innerHTML=`<span>${y}</span>`;
+      ys.appendChild(e);
     });
   }
-  /* 階段状：1 行 1 バー */
+
+  /* --- 階段状：1 行 1 バー --- */
   const bars=document.getElementById('bars');
   const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
   const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
   const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
+
+  /* 開始年昇順（同年内は終了年昇順） */
   data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start) - (+b.End||+b.Start));
   const total=data.length;
+
   data.forEach((r,i)=>{
     const s=+r.Start, e=+r.End||s;
     const left=X0+(s-FROM)*P;
     const width=Math.max((e-s||1)*P,4);
-    const top=LEG_H+(total-1-i)*(ROW_H+GAP);   /* 古いほど下へ配置 */
-    const box=document.createElement('div');box.className='bar-box';
+    /* 古いイベントほど下へ、新しいほど上へ（階段状）*/
+    const top=LEG_H+(total-1-i)*(ROW_H+GAP);
+
+    const box=document.createElement('div');
+    box.className='bar-box';
     box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
+
     box.innerHTML=`
       <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>
       <span class="lbl">${r.Title}</span>`;
-    bars.appendChild(box);
+    /* プレビュー画像を子要素として追加 */
     if(r.TooltipImg){
-      const pv=document.createElement('div');pv.className='preview';
-      pv.innerHTML=`<img src="${r.TooltipImg}" loading="lazy">`;box.after(pv);
+      const pv=document.createElement('div');
+      pv.className='preview';
+      pv.innerHTML=`<img src="${r.TooltipImg}" loading="lazy">`;
+      box.appendChild(pv);
     }
+    bars.appendChild(box);
   });
+
+  /* --- キャンバス高さ --- */
   document.getElementById('canvas').style.height=
       LEG_H+total*(ROW_H+GAP)+'px';
+
+  /* --- 右端はみ出し補正（必要時に左側へ） --- */
+  bars.addEventListener('mouseover',e=>{
+    const box=e.target.closest('.bar-box');
+    if(!box) return;
+    const pv=box.querySelector('.preview');
+    if(!pv) return;
+
+    /* CSS で display:block になる直前の計測用に強制表示 */
+    pv.style.display='block';
+
+    const rect=pv.getBoundingClientRect();
+    const over=(rect.right+8)-window.innerWidth; /* 8px 余白 */
+    if(over>0){
+      pv.style.left='auto';
+      pv.style.right='calc(100% + 8px)';
+    }else{
+      pv.style.left='calc(100% + 8px)';
+      pv.style.right='auto';
+    }
+  },true);
 }
 </script>
-</body></html>
+</body>
+</html>
