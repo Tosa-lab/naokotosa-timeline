@@ -3,24 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Naoko Tosa Timeline – stair + hover-preview (scroll-safe)</title>
+<title>Naoko Tosa Timeline</title>
 
 <style>
 /* --- reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.45;overflow-x:auto}
-a{color:inherit;text-decoration:none;cursor:pointer}
+html,body{width:100%;height:100%}
+body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.45}
 
 /* --- custom props --- */
 :root{
-  --W:1060; --PITCH:25; --X0:20;
-  --LEGEND-H:140; --ROW-H:20; --ROW-GAP:6;
+  --W:1060;           /* タイムラインの論理幅 (px)              */
+  --PITCH:25;         /* 1 年 = 25px                            */
+  --X0:20;            /* 1985 年の X 座標                       */
+  --LEGEND-H:140;
+  --ROW-H:20; --ROW-GAP:6;
 }
 
-/* --- canvas (scaled) --- */
+/* --- canvas ラッパー: スクロール時に左右が切れないよう中央寄せ --- */
+#wrapper{
+  width:100%;                       /* ビューポートいっぱい */
+  overflow-x:auto;                  /* 足りなければ横スクロール */
+  display:flex;justify-content:center; /* 中央寄せで左切れ防止 */
+}
+
+/* --- タイムライン本体 --- */
 #canvas{
-  position:relative;width:calc(var(--W)*1px);
-  transform-origin:top left;
+  position:relative;
+  width:calc(var(--W)*1px);
+  margin:0 auto;
+  transform-origin:top center;      /* 中央基準で縮小 */
   transform:scale(calc(min(100vw,1200px)/var(--W)));
 }
 
@@ -37,7 +49,8 @@ a{color:inherit;text-decoration:none;cursor:pointer}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
 
 /* --- legend --- */
-#legend{position:fixed;top:1rem;left:1rem;z-index:9999;
+#legend{
+  position:fixed;top:1rem;left:1rem;z-index:9999;
   display:flex;flex-direction:column;gap:.4rem;
   font-size:9pt;padding:1rem 1.2rem;
   background:#111e;backdrop-filter:blur(4px);
@@ -64,17 +77,19 @@ a{color:inherit;text-decoration:none;cursor:pointer}
 }
 #preview img{width:100%;display:block}
 
-/* --- scrollbar --- */
+/* --- scrollbar (Chrome) --- */
 ::-webkit-scrollbar{height:8px}
 ::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
 </style>
 </head>
 <body>
 
-<div id="canvas">
-  <div class="grid"></div>
-  <div id="years"></div>
-  <div id="bars"></div>
+<div id="wrapper">
+  <div id="canvas">
+    <div class="grid"></div>
+    <div id="years"></div>
+    <div id="bars"></div>
+  </div>
 </div>
 
 <div id="legend"></div>
@@ -105,10 +120,10 @@ fetch(CSV+'&t='+Date.now())
 
 /* draw timeline -------------------------------------------------- */
 function draw(data){
-  /* color palette */
+  /* palette */
   const cats=[...new Set(data.map(r=>r.Category))];
-  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
-  const catCol=Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
+  const col=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
+  const catCol=Object.fromEntries(cats.map((c,i)=>[c,col[i%col.length]]));
 
   /* legend */
   const leg=document.getElementById('legend');
@@ -119,7 +134,7 @@ function draw(data){
     leg.appendChild(d);
   });
 
-  /* year labels & grid */
+  /* years & grid */
   const ys=document.getElementById('years');
   const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
   const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
@@ -164,7 +179,7 @@ function draw(data){
   document.getElementById('canvas').style.height=
       LEG_H+total*(ROW_H+GAP)+'px';
 
-  /* hover preview ------------------------------------------------ */
+  /* hover preview */
   const preview=document.getElementById('preview');
 
   bars.addEventListener('mouseover',e=>{
@@ -177,15 +192,12 @@ function draw(data){
     const rect=lbl.getBoundingClientRect();
     const offset=10;
 
-    /* 基本位置: ラベル右+offset */
     let left=rect.right+offset;
     let top =rect.top;
 
-    /* 右端はみ出し補正 */
     if(left+preview.offsetWidth > window.innerWidth-10){
       left=window.innerWidth-preview.offsetWidth-10;
     }
-    /* 下端はみ出し補正 */
     if(top+preview.offsetHeight > window.innerHeight-10){
       top=window.innerHeight-preview.offsetHeight-10;
     }
@@ -194,7 +206,6 @@ function draw(data){
     preview.style.top =top +'px';
   });
 
-  /* hide on mouseout */
   bars.addEventListener('mouseout',e=>{
     const lbl=e.target.closest('.lbl');
     if(!lbl) return;
