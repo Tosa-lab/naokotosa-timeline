@@ -3,34 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Naoko Tosa Timeline – stair + left-label + hover-preview (v2)</title>
+<title>Naoko Tosa Timeline – stair + hover-preview (scroll-safe)</title>
 
 <style>
-/* --------- 基本リセット --------- */
+/* --- reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-height:1.45;overflow-x:auto}
 a{color:inherit;text-decoration:none;cursor:pointer}
 
-/* --------- カスタムプロパティ --------- */
+/* --- custom props --- */
 :root{
-  --W:1060;        /* タイムライン全幅(px)                      */
-  --PITCH:25;      /* 1 年 ＝ 25 px                             */
-  --X0:20;         /* 1985 年の X 座標                          */
-  --LEGEND-H:140;  /* 固定凡例の高さ                            */
-  --ROW-H:20;      /* 1 行 (= バーの高さ)                       */
-  --ROW-GAP:6;     /* 行間                                     */
+  --W:1060; --PITCH:25; --X0:20;
+  --LEGEND-H:140; --ROW-H:20; --ROW-GAP:6;
 }
 
-/* --------- キャンバス --------- */
+/* --- canvas (scaled) --- */
 #canvas{
-  position:relative;
-  width:calc(var(--W)*1px);
+  position:relative;width:calc(var(--W)*1px);
   transform-origin:top left;
-  /* 1200 px を超えると 1 : 1、それ未満は縮小 */
   transform:scale(calc(min(100vw,1200px)/var(--W)));
 }
 
-/* --------- 縦グリッド & 年ラベル --------- */
+/* --- grid & year labels --- */
 .grid{position:absolute;inset:0;pointer-events:none;z-index:0}
 .grid::before{
   content:"";display:block;height:100%;
@@ -42,143 +36,124 @@ a{color:inherit;text-decoration:none;cursor:pointer}
 .year{position:absolute;font-size:9pt;transform:translateX(-50%)}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
 
-/* --------- 凡例 --------- */
-#legend{
-  position:fixed;top:1rem;left:1rem;z-index:9999;
+/* --- legend --- */
+#legend{position:fixed;top:1rem;left:1rem;z-index:9999;
   display:flex;flex-direction:column;gap:.4rem;
   font-size:9pt;padding:1rem 1.2rem;
   background:#111e;backdrop-filter:blur(4px);
-  border:1px solid #333;border-radius:8px;
-}
+  border:1px solid #333;border-radius:8px}
 .leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
 
-/* --------- バー本体 & 見出し --------- */
+/* --- bar & label --- */
 .bar-box{position:absolute;font-size:9pt}
 .bar{display:block;height:10px;border:1px solid #000}
 
-/* 見出し（バーの左側に表示 & クリック可） */
 .lbl{
-  position:absolute;            /* bar-box を基準に絶対配置 */
-  right:calc(100% + 8px);        /* バー左端から 8 px 離す   */
-  top:-1px;                      /* バーと垂直位置合わせ     */
+  position:absolute;right:calc(100% + 8px);top:-1px;
   white-space:nowrap;color:#fff;
   text-decoration:underline 0.08em transparent;
   transition:text-decoration-color .2s;
 }
 .lbl:hover{ text-decoration-color:currentColor; }
 
-/* --------- グローバル画像プレビュー --------- */
-.preview{
+/* --- global preview --- */
+#preview{
   display:none;position:fixed;z-index:10000;pointer-events:none;
-  max-width:400px;               /* 画像の上限幅をここで調整 */
-  border-radius:8px;overflow:hidden;
+  max-width:400px;border-radius:8px;overflow:hidden;
   box-shadow:0 4px 12px rgba(0,0,0,.55);
 }
-.preview img{width:100%;display:block}
+#preview img{width:100%;display:block}
 
-/* --------- スクロールバー (Chrome) --------- */
+/* --- scrollbar --- */
 ::-webkit-scrollbar{height:8px}
 ::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
 </style>
 </head>
 <body>
 
-<!-- ===== キャンバス ===== -->
 <div id="canvas">
   <div class="grid"></div>
   <div id="years"></div>
   <div id="bars"></div>
 </div>
 
-<!-- ===== 凡例 ===== -->
 <div id="legend"></div>
-
-<!-- ===== グローバルプレビュー要素（JS で制御） ===== -->
-<div class="preview" id="preview"></div>
+<div id="preview"></div>
 
 <script>
-/* ---------- CSV → JSON ---------- */
+/* CSV -> JSON ---------------------------------------------------- */
 function csv2json(txt){
-  const rows = txt.trim().split(/\r?\n/).map(r=>{
-    const out=[], cell=[]; let q=false;
-    for(let i=0;i<r.length;i++){
-      const c=r[i];
-      if(c==='"'){ q=!q; continue; }
-      if(c===',' && !q){ out.push(cell.join('')); cell.length=0; continue; }
+  const rows=txt.trim().split(/\r?\n/).map(r=>{
+    const out=[],cell=[];let q=false;
+    for(const c of r){
+      if(c==='"'){q=!q;continue;}
+      if(c===','&&!q){out.push(cell.join(''));cell.length=0;continue;}
       cell.push(c);
     }
     out.push(cell.join(''));
     return out;
   });
-  const head = rows.shift();
+  const head=rows.shift();
   return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i],v.trim()])));
 }
 
-/* ---------- 公開シート (CSV) 読み込み ---------- */
-const CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
-fetch(CSV + '&t=' + Date.now())
-  .then(r => r.text())
-  .then(txt => draw(csv2json(txt)))
-  .catch(err => console.error('CSV 読み込み失敗', err));
+/* fetch CSV ------------------------------------------------------ */
+const CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
+fetch(CSV+'&t='+Date.now())
+  .then(r=>r.text()).then(t=>draw(csv2json(t)))
+  .catch(e=>console.error('CSV 読み込み失敗',e));
 
-/* ---------- タイムライン描画 ---------- */
+/* draw timeline -------------------------------------------------- */
 function draw(data){
-  /* ===== カテゴリ → 色 ===== */
-  const cats = [...new Set(data.map(r=>r.Category))];
-  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff',
-                 '#660099','#ff7f50','#ffa500'];    /* 8色ローテーション */
-  const catCol = Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
+  /* color palette */
+  const cats=[...new Set(data.map(r=>r.Category))];
+  const palette=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
+  const catCol=Object.fromEntries(cats.map((c,i)=>[c,palette[i%palette.length]]));
 
-  /* ===== 凡例 ===== */
-  const leg = document.getElementById('legend');
+  /* legend */
+  const leg=document.getElementById('legend');
   cats.forEach(c=>{
-    const div=document.createElement('div');
-    div.style.display='flex';div.style.alignItems='center';
-    div.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
-    leg.appendChild(div);
+    const d=document.createElement('div');
+    d.style.display='flex';d.style.alignItems='center';
+    d.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
+    leg.appendChild(d);
   });
 
-  /* ===== 年ラベル & グリッド ===== */
-  const ys   = document.getElementById('years');
-  const P    = +getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
-  const X0   = +getComputedStyle(document.documentElement).getPropertyValue('--X0');
-  const FROM = 1985;
-  const TO   = Math.max(...data.map(r=>+r.End||+r.Start), new Date().getFullYear()+1);
-  for(let y=FROM; y<=TO; y++){
-    const x = X0 + (y - FROM) * P;
+  /* year labels & grid */
+  const ys=document.getElementById('years');
+  const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
+  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
+  const FROM=1985;
+  const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
+  for(let y=FROM;y<=TO;y++){
+    const x=X0+(y-FROM)*P;
     ['top','bottom'].forEach(pos=>{
-      const e = document.createElement('div');
+      const e=document.createElement('div');
       e.className='year';e.style.left=`${x}px`;e.style[pos]='-36px';
       e.innerHTML=`<span>${y}</span>`;ys.appendChild(e);
     });
   }
 
-  /* ===== バー配置 (階段状) ===== */
-  const bars = document.getElementById('bars');
-  const LEG_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H'),10);
-  const ROW_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ROW-H'),10);
-  const GAP   = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP'),10);
+  /* bars */
+  const bars=document.getElementById('bars');
+  const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
+  const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
+  const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
 
-  /* 開始年が古い順 (左から右) に並べる → 行番号が確定 */
-  data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start) - (+b.End||+b.Start));
-  const total = data.length;   /* 行数＝データ数 */
+  data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start)-(+b.End||+b.Start));
+  const total=data.length;
 
   data.forEach((r,i)=>{
-    const s = +r.Start;
-    const e = +r.End || s;
-    const left  = X0 + (s - FROM) * P;
-    const width = Math.max((e - s || 1) * P, 4);
+    const s=+r.Start, e=+r.End||s;
+    const left=X0+(s-FROM)*P;
+    const width=Math.max((e-s||1)*P,4);
+    const top=LEG_H+(total-1-i)*(ROW_H+GAP);
 
-    /* 行位置: 最古データが一番下、最新が一番上 */
-    const top = LEG_H + (total - 1 - i) * (ROW_H + GAP);
-
-    /* --- DOM 生成 --- */
-    const box = document.createElement('div');
+    const box=document.createElement('div');
     box.className='bar-box';
     box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
-    /* 見出しをリンク化。画像 URL は data-img に格納 */
-    box.innerHTML = `
+    box.innerHTML=`
       <a class="lbl" href="${r.Link||'#'}" target="_blank"
          ${r.TooltipImg ? `data-img="${r.TooltipImg}"` : ''}>${r.Title}</a>
       <a class="bar" href="${r.Link||'#'}" target="_blank"
@@ -186,42 +161,45 @@ function draw(data){
     bars.appendChild(box);
   });
 
-  /* ===== キャンバス高さ調整 ===== */
-  document.getElementById('canvas').style.height =
-      LEG_H + total * (ROW_H + GAP) + 'px';
+  document.getElementById('canvas').style.height=
+      LEG_H+total*(ROW_H+GAP)+'px';
 
-  /* ===== 画像プレビューイベント ===== */
-  const previewEl = document.getElementById('preview');
+  /* hover preview ------------------------------------------------ */
+  const preview=document.getElementById('preview');
 
-  /* マウスが見出しに入ったら画像を表示 */
-  bars.addEventListener('mouseover', e=>{
-    const tgt = e.target.closest('.lbl');
-    if(!tgt || !tgt.dataset.img) return;
+  bars.addEventListener('mouseover',e=>{
+    const lbl=e.target.closest('.lbl');
+    if(!lbl||!lbl.dataset.img) return;
 
-    /* 画像セット */
-    previewEl.innerHTML = `<img src="${tgt.dataset.img}" loading="lazy">`;
-    previewEl.style.display='block';
+    preview.innerHTML=`<img src="${lbl.dataset.img}" loading="lazy">`;
+    preview.style.display='block';
 
-    /* 位置計算: ラベルの右側＋10 px / 同じ行高さ */
-    const rect = tgt.getBoundingClientRect();
-    const offset = 10;
-    const left = rect.right + offset + window.scrollX;
-    let top   = rect.top + window.scrollY;
+    const rect=lbl.getBoundingClientRect();
+    const offset=10;
 
-    /* 画面外に出ないよう下限チェック */
-    const maxY = window.scrollY + window.innerHeight - previewEl.offsetHeight - 10;
-    if(top > maxY) top = maxY;
+    /* 基本位置: ラベル右+offset */
+    let left=rect.right+offset;
+    let top =rect.top;
 
-    previewEl.style.left = left + 'px';
-    previewEl.style.top  = top  + 'px';
+    /* 右端はみ出し補正 */
+    if(left+preview.offsetWidth > window.innerWidth-10){
+      left=window.innerWidth-preview.offsetWidth-10;
+    }
+    /* 下端はみ出し補正 */
+    if(top+preview.offsetHeight > window.innerHeight-10){
+      top=window.innerHeight-preview.offsetHeight-10;
+    }
+
+    preview.style.left=left+'px';
+    preview.style.top =top +'px';
   });
 
-  /* マウスが見出しを離れたら非表示 (relatedTarget がプレビューなら維持) */
-  bars.addEventListener('mouseout', e=>{
-    const tgt = e.target.closest('.lbl');
-    if(!tgt) return;
-    if(!previewEl.contains(e.relatedTarget)){
-      previewEl.style.display='none';
+  /* hide on mouseout */
+  bars.addEventListener('mouseout',e=>{
+    const lbl=e.target.closest('.lbl');
+    if(!lbl) return;
+    if(!preview.contains(e.relatedTarget)){
+      preview.style.display='none';
     }
   });
 }
