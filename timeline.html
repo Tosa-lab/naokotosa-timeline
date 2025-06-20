@@ -16,86 +16,34 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   --W:1060;           /* タイムラインの論理幅 (px)              */
   --PITCH:25;         /* 1 年 = 25px                            */
   --X0:20;            /* 1985 年の X 座標                       */
-  --LEGEND-H:140;
-  --ROW-H:20; --ROW-GAP:6;
+  --LEGEND-H:140;     /* 凡例ボックス高さ                      */
+  --ROW-H:20; --ROW-GAP:6; /* バー高さと行間                     */
 }
 
 /* --- canvas ラッパー: スクロール時に左右が切れないよう中央寄せ --- */
-#wrapper{
-  width:100%;                       /* ビューポートいっぱい */
-  overflow-x:auto;                  /* 足りなければ横スクロール */
-  display:flex;justify-content:center; /* 中央寄せで左切れ防止 */
-  position:relative;                /* sticky ヘッダーの基準 */
-}
-
-/* ==== year header (fixed top row) ==== */
-#year-header{
-  position:sticky;   /* ビューポート上部に貼り付く */
-  top:0;
-  z-index:1000;      /* 他要素より前面に */
-  height:36px;       /* ラベル分の高さ */
-  background:#111;   /* 好みで */
-}
-.year-top{
-  position:absolute;
-  top:10px;          /* 見栄え調整 */
-  font-size:9pt;
-  transform:translateX(-50%);
-  white-space:nowrap;
-}
+#wrapper{width:100%;overflow-x:auto;display:flex;justify-content:center}
 
 /* --- タイムライン本体 --- */
-#canvas{
-  position:relative;
-  width:calc(var(--W)*1px);
-  margin:0 auto;
-  padding-top:45px;
-  padding-bottom:45px;
-  transform-origin:top center;      /* 中央基準で縮小 */
-  transform:
-      scaleX(calc(min(100vw,1200px)/var(--W)))
-      scaleY(1);
-}
+#canvas{position:relative;width:calc(var(--W)*1px);margin:0 auto;padding-top:45px;padding-bottom:45px;transform-origin:top center;transform:scaleX(calc(min(100vw,1200px)/var(--W))) scaleY(1)}
 
-/* --- grid & year labels (中段と下段) --- */
+/* --- grid & year labels --- */
 .grid{position:absolute;inset:0;pointer-events:none;z-index:0}
-.grid::before{
-  content:"";display:block;height:100%;
-  background-image:repeating-linear-gradient(
-       to right,#444 0,#444 1px,transparent 1px,
-       transparent calc(var(--PITCH)*1px));
-  background-position:calc(var(--X0)*1px) 0;
-}
+.grid::before{content:"";display:block;height:100%;background-image:repeating-linear-gradient(to right,#444 0,#444 1px,transparent 1px,transparent calc(var(--PITCH)*1px));background-position:calc(var(--X0)*1px) 0}
 .year{position:absolute;font-size:9pt;transform:translateX(-50%)}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
 
 /* --- legend --- */
-#legend{
-  position:fixed;top:1rem;left:1rem;z-index:9999;
-  display:flex;flex-direction:column;gap:.4rem;
-  font-size:9pt;padding:1rem 1.2rem;
-  background:#111e;backdrop-filter:blur(4px);
-  border:1px solid #333;border-radius:8px}
+#legend{position:fixed;top:1rem;left:1rem;z-index:9999;display:flex;flex-direction:column;gap:.4rem;font-size:9pt;padding:1rem 1.2rem;background:#111e;backdrop-filter:blur(4px);border:1px solid #333;border-radius:8px}
 .leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
 
 /* --- bar & label --- */
 .bar-box{position:absolute;font-size:9pt}
 .bar{display:block;height:10px;border:1px solid #000}
-
-.lbl{
-  position:absolute;right:calc(100% + 8px);top:-1px;
-  white-space:nowrap;color:#fff;
-  text-decoration:underline 0.08em transparent;
-  transition:text-decoration-color .2s;
-}
-.lbl:hover{ text-decoration-color:currentColor; }
+.lbl{position:absolute;right:calc(100% + 8px);top:-1px;white-space:nowrap;color:#fff;text-decoration:underline 0.08em transparent;transition:text-decoration-color .2s}
+.lbl:hover{text-decoration-color:currentColor}
 
 /* --- global preview --- */
-#preview{
-  display:none;position:fixed;z-index:10000;pointer-events:none;
-  max-width:400px;border-radius:8px;overflow:hidden;
-  box-shadow:0 4px 12px rgba(0,0,0,.55);
-}
+#preview{display:none;position:fixed;z-index:10000;pointer-events:none;max-width:400px;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.55)}
 #preview img{width:100%;display:block}
 
 /* --- scrollbar (Chrome) --- */
@@ -106,9 +54,6 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 <body>
 
 <div id="wrapper">
-  <!-- 追加: sticky ヘッダー -->
-  <div id="year-header"></div>
-  <!-- タイムライン本体 -->
   <div id="canvas">
     <div class="grid"></div>
     <div id="years"></div>
@@ -151,7 +96,6 @@ function draw(data){
 
   /* legend */
   const leg=document.getElementById('legend');
-  leg.innerHTML='';
   cats.forEach(c=>{
     const d=document.createElement('div');
     d.style.display='flex';d.style.alignItems='center';
@@ -159,43 +103,34 @@ function draw(data){
     leg.appendChild(d);
   });
 
-  /* constants */
-  const P=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--PITCH'));
-  const X0=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--X0'));
-  const ROW_H=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ROW-H'));
-  const GAP   =parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP'));
-  const LEG_H =parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H'));
-
-  /* years & grid (中段と下段) */
+  /* years & grid */
   const ys=document.getElementById('years');
-  ys.innerHTML='';
+  const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
+  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
   const FROM=1985;
   const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
   for(let y=FROM;y<=TO;y++){
     const x=X0+(y-FROM)*P;
+    /**
+     * 上下とも同じ方法でラベル生成
+     * 位置プロパティのみ top / bottom を切替
+     */
     ['top','bottom'].forEach(pos=>{
       const e=document.createElement('div');
-      e.className='year';e.style.left=`${x}px`;e.style[pos]='-36px';
-      e.innerHTML=`<span>${y}</span>`;ys.appendChild(e);
+      e.className='year';
+      e.style.left=`${x}px`;
+      e.style[pos]='-36px';
+      e.innerHTML=`<span>${y}</span>`;
+      ys.appendChild(e);
     });
-  }
-
-  /* sticky ヘッダー: 上段年ラベル */
-  const header=document.getElementById('year-header');
-  header.innerHTML='';
-  header.style.width=`${(TO-FROM+1)*P}px`; // タイムラインと同じ幅
-  for(let y=FROM;y<=TO;y++){
-    const x=X0+(y-FROM)*P;
-    const lbl=document.createElement('div');
-    lbl.className='year-top';
-    lbl.style.left=`${x}px`;
-    lbl.textContent=y;
-    header.appendChild(lbl);
   }
 
   /* bars */
   const bars=document.getElementById('bars');
-  bars.innerHTML='';
+  const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
+  const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
+  const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
+
   data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start)-(+b.End||+b.Start));
   const total=data.length;
 
@@ -210,15 +145,12 @@ function draw(data){
     box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
     box.innerHTML=`
-      <a class="lbl" href="${r.Link||'#'}" target="_blank"
-         ${r.TooltipImg ? `data-img="${r.TooltipImg}"` : ''}>${r.Title}</a>
-      <a class="bar" href="${r.Link||'#'}" target="_blank"
-         style="background:${catCol[r.Category]};width:${width}px"></a>`;
+      <a class="lbl" href="${r.Link||'#'}" target="_blank" ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
+      <a class="bar" href="${r.Link||'#'}" target="_blank" style="background:${catCol[r.Category]};width:${width}px"></a>`;
     bars.appendChild(box);
   });
 
-  document.getElementById('canvas').style.height=
-      LEG_H+total*(ROW_H+GAP)+'px';
+  document.getElementById('canvas').style.height=LEG_H+total*(ROW_H+GAP)+'px';
 
   /* hover preview */
   const preview=document.getElementById('preview');
@@ -231,27 +163,17 @@ function draw(data){
 
     const rect=lbl.getBoundingClientRect();
     const offset=10;
-
     let left=rect.right+offset;
     let top =rect.top;
-
-    if(left+preview.offsetWidth > window.innerWidth-10){
-      left=window.innerWidth-preview.offsetWidth-10;
-    }
-    if(top+preview.offsetHeight > window.innerHeight-10){
-      top=window.innerHeight-preview.offsetHeight-10;
-    }
-
+    if(left+preview.offsetWidth>window.innerWidth-10){left=window.innerWidth-preview.offsetWidth-10;}
+    if(top+preview.offsetHeight>window.innerHeight-10){top=window.innerHeight-preview.offsetHeight-10;}
     preview.style.left=left+'px';
     preview.style.top =top +'px';
   });
-
   bars.addEventListener('mouseout',e=>{
     const lbl=e.target.closest('.lbl');
     if(!lbl) return;
-    if(!preview.contains(e.relatedTarget)){
-      preview.style.display='none';
-    }
+    if(!preview.contains(e.relatedTarget)) preview.style.display='none';
   });
 }
 </script>
