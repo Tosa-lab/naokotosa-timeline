@@ -25,6 +25,23 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   width:100%;                       /* ビューポートいっぱい */
   overflow-x:auto;                  /* 足りなければ横スクロール */
   display:flex;justify-content:center; /* 中央寄せで左切れ防止 */
+  position:relative;                /* sticky ヘッダーの基準 */
+}
+
+/* ==== year header (fixed top row) ==== */
+#year-header{
+  position:sticky;   /* ビューポート上部に貼り付く */
+  top:0;
+  z-index:1000;      /* 他要素より前面に */
+  height:36px;       /* ラベル分の高さ */
+  background:#111;   /* 好みで */
+}
+.year-top{
+  position:absolute;
+  top:10px;          /* 見栄え調整 */
+  font-size:9pt;
+  transform:translateX(-50%);
+  white-space:nowrap;
 }
 
 /* --- タイムライン本体 --- */
@@ -32,15 +49,15 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   position:relative;
   width:calc(var(--W)*1px);
   margin:0 auto;
-  padding-top: 45px;
-  padding-bottom: 45px;
+  padding-top:45px;
+  padding-bottom:45px;
   transform-origin:top center;      /* 中央基準で縮小 */
   transform:
       scaleX(calc(min(100vw,1200px)/var(--W)))
       scaleY(1);
 }
 
-/* --- grid & year labels --- */
+/* --- grid & year labels (中段と下段) --- */
 .grid{position:absolute;inset:0;pointer-events:none;z-index:0}
 .grid::before{
   content:"";display:block;height:100%;
@@ -89,6 +106,9 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 <body>
 
 <div id="wrapper">
+  <!-- 追加: sticky ヘッダー -->
+  <div id="year-header"></div>
+  <!-- タイムライン本体 -->
   <div id="canvas">
     <div class="grid"></div>
     <div id="years"></div>
@@ -105,7 +125,7 @@ function csv2json(txt){
   const rows=txt.trim().split(/\r?\n/).map(r=>{
     const out=[],cell=[];let q=false;
     for(const c of r){
-      if(c==='"'){q=!q;continue;}
+      if(c==='\"'){q=!q;continue;}
       if(c===','&&!q){out.push(cell.join(''));cell.length=0;continue;}
       cell.push(c);
     }
@@ -131,6 +151,7 @@ function draw(data){
 
   /* legend */
   const leg=document.getElementById('legend');
+  leg.innerHTML='';
   cats.forEach(c=>{
     const d=document.createElement('div');
     d.style.display='flex';d.style.alignItems='center';
@@ -138,10 +159,16 @@ function draw(data){
     leg.appendChild(d);
   });
 
-  /* years & grid */
+  /* constants */
+  const P=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--PITCH'));
+  const X0=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--X0'));
+  const ROW_H=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ROW-H'));
+  const GAP   =parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP'));
+  const LEG_H =parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H'));
+
+  /* years & grid (中段と下段) */
   const ys=document.getElementById('years');
-  const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
-  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
+  ys.innerHTML='';
   const FROM=1985;
   const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
   for(let y=FROM;y<=TO;y++){
@@ -153,12 +180,22 @@ function draw(data){
     });
   }
 
+  /* sticky ヘッダー: 上段年ラベル */
+  const header=document.getElementById('year-header');
+  header.innerHTML='';
+  header.style.width=`${(TO-FROM+1)*P}px`; // タイムラインと同じ幅
+  for(let y=FROM;y<=TO;y++){
+    const x=X0+(y-FROM)*P;
+    const lbl=document.createElement('div');
+    lbl.className='year-top';
+    lbl.style.left=`${x}px`;
+    lbl.textContent=y;
+    header.appendChild(lbl);
+  }
+
   /* bars */
   const bars=document.getElementById('bars');
-  const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
-  const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
-  const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
-
+  bars.innerHTML='';
   data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start)-(+b.End||+b.Start));
   const total=data.length;
 
@@ -185,7 +222,6 @@ function draw(data){
 
   /* hover preview */
   const preview=document.getElementById('preview');
-
   bars.addEventListener('mouseover',e=>{
     const lbl=e.target.closest('.lbl');
     if(!lbl||!lbl.dataset.img) return;
