@@ -33,7 +33,9 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   width:calc(var(--W)*1px);
   margin:0 auto;
   transform-origin:top center;      /* 中央基準で縮小 */
-  transform:scale(calc(min(100vw,1200px)/var(--W)));
+  transform:
+      scaleX(calc(min(100vw,1200px)/var(--W)))
+      scaleY(1);
 }
 
 /* --- grid & year labels --- */
