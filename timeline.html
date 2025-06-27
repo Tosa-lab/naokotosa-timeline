@@ -24,158 +24,108 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 #wrapper{width:100%;overflow-x:auto;display:flex;justify-content:center}
 
 /* --- タイムライン本体 --- */
-#canvas{position:relative;width:calc(var(--W)*1px);margin:0 auto;padding-top:45px;padding-bottom:45px;transform-origin:top center;transform:scaleX(calc(min(100vw,1200px)/var(--W))) scaleY(1)}
+#canvas{position:relative;width:calc(var(--W)*1px);margin:0 auto;padding-top:45px;padding-bottom:45px;transform-origin:top center;transform:scaleX(1)}
 
 /* --- grid & year labels --- */
-.grid{position:absolute;inset:0;pointer-events:none;z-index:0}
-.grid::before{content:"";display:block;height:100%;background-image:repeating-linear-gradient(to right,#444 0,#444 1px,transparent 1px,transparent calc(var(--PITCH)*1px));background-position:calc(var(--X0)*1px) 0}
-.year{position:absolute;font-size:9pt;transform:translateX(-50%)}
+.grid{position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(to right,rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.04) 1px,transparent 1px);background-size:calc(var(--PITCH)*1px) var(--ROW-H) ,100% var(--ROW-H)}
+.grid::before{content:"";position:absolute;left:calc(var(--X0)*1px);top:0;width:2px;height:100%;background:#fff}
+.year{position:sticky;z-index:10;font-size:9pt;transform:translateX(-50%);pointer-events:none}
 .year span{display:inline-block;transform:rotate(-70deg);transform-origin:top center}
+.year.top{top:4px}
+.year.bottom{bottom:4px}
 
 /* --- legend --- */
-#legend{position:fixed;top:1rem;left:1rem;z-index:9999;display:flex;flex-direction:column;gap:.4rem;font-size:9pt;padding:1rem 1.2rem;background:#111e;backdrop-filter:blur(4px);border:1px solid #333;border-radius:8px}
-.leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
+#legend{position:fixed;top:1rem;left:1rem;z-index:9999;display:flex;flex-direction:column;gap:.4rem;font-size:9pt;padding:1rem;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(4px)}
+#legend h2{font-size:1rem;margin-bottom:.4rem}
+#legend div{display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.legend-color{width:1.2rem;height:.8rem;border-radius:2px}
 
-/* --- bar & label --- */
-.bar-box{position:absolute;font-size:9pt}
-.bar{display:block;height:10px;border:1px solid #000}
-.lbl{position:absolute;right:calc(100% + 8px);top:-1px;white-space:nowrap;color:#fff;text-decoration:underline 0.08em transparent;transition:text-decoration-color .2s}
-.lbl:hover{text-decoration-color:currentColor}
+.bar{position:absolute;height:calc(var(--ROW-H)*1px);background:rgba(255,255,255,.7);border-radius:2px;padding:0 .4rem;display:flex;align-items:center;font-size:8pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* --- global preview --- */
-#preview{display:none;position:fixed;z-index:10000;pointer-events:none;max-width:400px;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.55)}
-#preview img{width:100%;display:block}
-
-/* --- scrollbar (Chrome) --- */
-::-webkit-scrollbar{height:8px}
-::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
+/* --- media query: narrow screens – horizontally squash the timeline --- */
+@media(max-width:768px){
+  #canvas{transform:scaleX(.75)}
+}
 </style>
 </head>
+
 <body>
+<div id="legend"></div>
 
 <div id="wrapper">
   <div id="canvas">
-    <div class="grid"></div>
+    <div id="grid" class="grid"></div>
     <div id="years"></div>
     <div id="bars"></div>
   </div>
 </div>
 
-<div id="legend"></div>
-<div id="preview"></div>
-
 <script>
-/* CSV -> JSON ---------------------------------------------------- */
-function csv2json(txt){
-  const rows=txt.trim().split(/\r?\n/).map(r=>{
-    const out=[],cell=[];let q=false;
-    for(const c of r){
-      if(c==='\"'){q=!q;continue;}
-      if(c===','&&!q){out.push(cell.join(''));cell.length=0;continue;}
-      cell.push(c);
-    }
-    out.push(cell.join(''));
-    return out;
-  });
-  const head=rows.shift();
-  return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i],v.trim()])));
-}
+/* === CONFIG === */
+const START_YEAR=1985;
+const END_YEAR  =2025;
+const CATEGORIES={
+  "Solo Exhibition":"#ea4335",
+  "Group Exhibition":"#4285f4",
+  "Award":"#fbbc05",
+  "Performance":"#34a853",
+  "Residency":"#c5221f",
+  "Other":"#9aa0a6"
+};
+/* Data: [title, start-year, end-year(optional), category] */
+const DATA=[
+  ["Light Sculpture Exhibition",1993,null,"Solo Exhibition"],
+  ["'Sound of Ikebana' Launch",2012,null,"Other"],
+  ["'New Japanism: Four Seasons'",2025,null,"Performance"],
+  /* …必要に応じて追加… */
+];
 
-/* fetch CSV ------------------------------------------------------ */
-const CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
-fetch(CSV+'&t='+Date.now())
-  .then(r=>r.text()).then(t=>draw(csv2json(t)))
-  .catch(e=>console.error('CSV 読み込み失敗',e));
+/* === BUILD TIMELINE === */
+const PITCH = +getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
+const X0    = +getComputedStyle(document.documentElement).getPropertyValue('--X0');
+const ys    = document.getElementById('years');
 
-/* draw timeline -------------------------------------------------- */
-function draw(data){
-  /* palette */
-  const cats=[...new Set(data.map(r=>r.Category))];
-  const col=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
-  const catCol=Object.fromEntries(cats.map((c,i)=>[c,col[i%col.length]]));
-
-  /* legend */
-  const leg=document.getElementById('legend');
-  cats.forEach(c=>{
-    const d=document.createElement('div');
-    d.style.display='flex';d.style.alignItems='center';
-    d.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
-    leg.appendChild(d);
-  });
-
-  /* years & grid */
-  const ys=document.getElementById('years');
-  const P=+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
-  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
-  const FROM=1985;
-  const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
-  for(let y=FROM;y<=TO;y++){
-    const x=X0+(y-FROM)*P;
-    /**
-     * 上下とも同じ方法でラベル生成
-     * 位置プロパティのみ top / bottom を切替
-     */
-    ['top','bottom'].forEach(pos=>{
-      const e=document.createElement('div');
-      e.className='year';
-      e.style.left=`${x}px`;
-      e.style[pos]='-36px';
-      e.innerHTML=`<span>${y}</span>`;
-      ys.appendChild(e);
-    });
-  }
-
-  /* bars */
-  const bars=document.getElementById('bars');
-  const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
-  const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
-  const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
-
-  data.sort((a,b)=>+a.Start - +b.Start || (+a.End||+a.Start)-(+b.End||+b.Start));
-  const total=data.length;
-
-  data.forEach((r,i)=>{
-    const s=+r.Start, e=+r.End||s;
-    const left=X0+(s-FROM)*P;
-    const width=Math.max((e-s||1)*P,4);
-    const top=LEG_H+(total-1-i)*(ROW_H+GAP);
-
-    const box=document.createElement('div');
-    box.className='bar-box';
-    box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
-
-    box.innerHTML=`
-      <a class="lbl" href="${r.Link||'#'}" target="_blank" ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
-      <a class="bar" href="${r.Link||'#'}" target="_blank" style="background:${catCol[r.Category]};width:${width}px"></a>`;
-    bars.appendChild(box);
-  });
-
-  document.getElementById('canvas').style.height=LEG_H+total*(ROW_H+GAP)+'px';
-
-  /* hover preview */
-  const preview=document.getElementById('preview');
-  bars.addEventListener('mouseover',e=>{
-    const lbl=e.target.closest('.lbl');
-    if(!lbl||!lbl.dataset.img) return;
-
-    preview.innerHTML=`<img src="${lbl.dataset.img}" loading="lazy">`;
-    preview.style.display='block';
-
-    const rect=lbl.getBoundingClientRect();
-    const offset=10;
-    let left=rect.right+offset;
-    let top =rect.top;
-    if(left+preview.offsetWidth>window.innerWidth-10){left=window.innerWidth-preview.offsetWidth-10;}
-    if(top+preview.offsetHeight>window.innerHeight-10){top=window.innerHeight-preview.offsetHeight-10;}
-    preview.style.left=left+'px';
-    preview.style.top =top +'px';
-  });
-  bars.addEventListener('mouseout',e=>{
-    const lbl=e.target.closest('.lbl');
-    if(!lbl) return;
-    if(!preview.contains(e.relatedTarget)) preview.style.display='none';
+/* year labels (top & bottom) */
+for(let y=START_YEAR;y<=END_YEAR;y++){
+  const x=(y-START_YEAR)*PITCH+X0;
+  ['top','bottom'].forEach(pos=>{
+    const e=document.createElement('div');
+    e.className=`year ${pos}`;
+    e.style.left=`${x}px`;
+    e.innerHTML=`<span>${y}</span>`;
+    ys.appendChild(e);
   });
 }
+
+/* bars */
+const bars=document.getElementById('bars');
+const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
+const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
+const ROW_GAP=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
+
+DATA.forEach((d,i)=>{
+  const [title,sy,ey,cat]=d;
+  const y0=i*(ROW_H+ROW_GAP)+LEG_H;
+  const x0=(sy-START_YEAR)*PITCH+X0;
+  const w=((ey??sy)-sy+1)*PITCH;
+  const el=document.createElement('div');
+  el.className='bar';
+  el.textContent=title;
+  el.style.left=`${x0}px`;
+  el.style.top =`${y0}px`;
+  el.style.width=`${w}px`;
+  el.style.background=CATEGORIES[cat]||'#fff';
+  bars.appendChild(el);
+});
+
+/* legend */
+const legend=document.getElementById('legend');
+const h2=document.createElement('h2');h2.textContent='Legend';legend.appendChild(h2);
+Object.entries(CATEGORIES).forEach(([k,col])=>{
+  const row=document.createElement('div');
+  row.innerHTML=`<span class="legend-color" style="background:${col}"></span>${k}`;
+  legend.appendChild(row);
+});
 </script>
 </body>
 </html>
