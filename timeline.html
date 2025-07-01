@@ -62,10 +62,11 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   content:"";
   display:block; height:100%;
   background-image:repeating-linear-gradient(
-     to right,#444 0,#444 1px,transparent 1px,
+     to right,#444 0,#444 2px,transparent 2px,
      transparent calc(var(--PITCH)*1px));
   background-position:calc(var(--X0)*1px) 0;
 }
+.grid{ background:linear-gradient( to right, transparent 0 1px ) no-repeat; }
 .year{
   position:absolute;
   font-size:9pt;
