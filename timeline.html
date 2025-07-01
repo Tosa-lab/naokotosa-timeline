@@ -37,6 +37,7 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   width:calc(var(--W)*1px);
   margin:0 auto;
   padding:80px 0 70px;            /* ← 上下余白を十分確保 */
+  padding-top:110px;   /* ← 80px → 110px に増量（他の padding はそのまま） */
   transform-origin:top center;
   transform:scaleX(calc(min(100vw,1200px)/var(--W))) scaleY(1);
 }
@@ -70,7 +71,9 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   font-size:9pt;
   transform:translateX(-50%);
 }
-.year.top{   top:0;   }           /* ← もう negative にしない */
+.year.top{
+  top:14px;            /* ← 数 px 動かしながら好みで微調整可 */
+}
 .year.bottom{ bottom:-34px; }     /* 余白確保のため少し下げる */
 .year span{
   display:inline-block;
