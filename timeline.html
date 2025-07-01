@@ -1,4 +1,4 @@
-<!-- =========  timeline.html 全文  ========= -->
+<!-- =========  timeline.html (2025‑07‑改訂版)  ========= -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -14,51 +14,55 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 
 /* --- custom props --- */
 :root{
-  --W:1060;           /* タイムラインの論理幅 (px)              */
-  --PITCH:25;         /* 1 年 = 25px                            */
-  --X0:20;            /* 1985 年の X 座標                       */
-  --LEGEND-H:140;     /* 凡例ボックス高さ                      */
-  --ROW-H:20; --ROW-GAP:6; /* バー高さと行間                     */
+  --W:1060;                 /* タイムライン論理幅 */
+  --PITCH:25;               /* 1 年 = 25px        */
+  --X0:20;                  /* 1985 年の X 座標   */
+  --LEGEND-H:140;           /* 凡例高さ           */
+  --ROW-H:20; --ROW-GAP:6;  /* バー高さ & 行間    */
 }
 
-/* --- canvas ラッパー: 横スクロールのみ許可 --- */
+/* --- 横スクロールコンテナ --- */
 #wrapper{
   width:100%;
   overflow-x:auto;
-  overflow-y:visible;        /* 縦は親ページでまとめる */
+  overflow-y:visible;
   display:flex;
   justify-content:center;
   -webkit-overflow-scrolling:touch;
 }
 
-/* --- timeline 本体 --- */
+/* --- タイムライン本体 --- */
 #canvas{
   position:relative;
   width:calc(var(--W)*1px);
   margin:0 auto;
-  padding:60px 0 45px;       /* 上側余白 +15px（年ラベル用） */
+  padding:80px 0 70px;            /* ← 上下余白を十分確保 */
   transform-origin:top center;
   transform:scaleX(calc(min(100vw,1200px)/var(--W))) scaleY(1);
 }
 
+/* ---------- モバイル専用 ---------- */
+@media (max-width:767.98px){
+  #canvas{ transform:none; }      /* ← scaleX を解除 (タッチ座標ずれ対策) */
+  #legend{
+    position:static;
+    margin:0.5rem auto 1rem;
+    flex-direction:row;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+}
+
 /* --- grid & year labels --- */
 .grid{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  z-index:0;
+  position:absolute; inset:0; pointer-events:none; z-index:0;
 }
 .grid::before{
   content:"";
-  display:block;
-  height:100%;
+  display:block; height:100%;
   background-image:repeating-linear-gradient(
-      to right,
-      #444 0,
-      #444 1px,
-      transparent 1px,
-      transparent calc(var(--PITCH)*1px)
-  );
+     to right,#444 0,#444 1px,transparent 1px,
+     transparent calc(var(--PITCH)*1px));
   background-position:calc(var(--X0)*1px) 0;
 }
 .year{
@@ -66,6 +70,8 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   font-size:9pt;
   transform:translateX(-50%);
 }
+.year.top{   top:0;   }           /* ← もう negative にしない */
+.year.bottom{ bottom:-34px; }     /* 余白確保のため少し下げる */
 .year span{
   display:inline-block;
   transform:rotate(-70deg);
@@ -75,58 +81,36 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 /* --- legend --- */
 #legend{
   position:fixed;
-  top:1rem;
-  left:1rem;
-  z-index:9999;
-  display:flex;
-  flex-direction:column;
-  gap:.4rem;
-  font-size:9pt;
-  padding:1rem 1.2rem;
-  background:#111e;
-  backdrop-filter:blur(4px);
-  border:1px solid #333;
-  border-radius:8px;
+  top:1rem; left:1rem; z-index:9999;
+  display:flex; flex-direction:column; gap:.4rem;
+  font-size:9pt; padding:1rem 1.2rem;
+  background:#111e; backdrop-filter:blur(4px);
+  border:1px solid #333; border-radius:8px;
 }
-.leg-bar{
-  width:26px;
-  height:10px;
-  border:1px solid #000;
-  margin-right:.4rem;
-}
+.leg-bar{width:26px;height:10px;border:1px solid #000;margin-right:.4rem}
 
 /* --- bar & label --- */
 .bar-box{position:absolute;font-size:9pt}
-.bar{
-  display:block;
-  height:10px;
-  border:1px solid #000;
-}
+.bar{display:block;height:10px;border:1px solid #000}
 .lbl{
   position:absolute;
-  right:calc(100% + 8px);
-  top:-1px;
-  white-space:nowrap;
-  color:#fff;
-  text-decoration:underline 0.08em transparent;
+  right:calc(100% + 8px); top:-1px;
+  white-space:nowrap; color:#fff;
+  text-decoration:underline .08em transparent;
   transition:text-decoration-color .2s;
 }
 .lbl:hover{ text-decoration-color:currentColor }
 
-/* --- global preview --- */
+/* --- preview on hover --- */
 #preview{
-  display:none;
-  position:fixed;
-  z-index:10000;
-  pointer-events:none;
-  max-width:400px;
-  border-radius:8px;
-  overflow:hidden;
+  display:none; position:fixed; z-index:10000;
+  pointer-events:none; max-width:400px;
+  border-radius:8px; overflow:hidden;
   box-shadow:0 4px 12px rgba(0,0,0,.55);
 }
 #preview img{width:100%;display:block}
 
-/* --- scrollbar (Chrome) --- */
+/* --- WebKit scrollbar --- */
 ::-webkit-scrollbar{height:8px}
 ::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
 </style>
@@ -137,8 +121,8 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 <div id="wrapper">
   <div id="canvas">
     <div class="grid"></div>
-    <div id="years"></div>
-    <div id="bars"></div>
+    <div id="years"></div>   <!-- 年ラベル -->
+    <div id="bars"></div>    <!-- イベントバー -->
   </div>
 </div>
 
@@ -146,155 +130,128 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 <div id="preview"></div>
 
 <script>
-/* ==========================================================
-   ヘルパー: CSV → JSON
-   ========================================================== */
+/* ---------- CSV → JSON ---------- */
 function csv2json(txt){
-  const rows = txt.trim().split(/\r?\n/).map(r=>{
-    const out=[], cell=[]; let q=false;
+  const rows=txt.trim().split(/\r?\n/).map(r=>{
+    const out=[],cell=[];let q=false;
     for(const c of r){
-      if(c === '"'){ q=!q; continue; }
-      if(c === ',' && !q){ out.push(cell.join('')); cell.length=0; continue; }
+      if(c==='\"'){q=!q;continue;}
+      if(c===','&&!q){out.push(cell.join(''));cell.length=0;continue;}
       cell.push(c);
     }
     out.push(cell.join(''));
     return out;
   });
-  const head = rows.shift();
-  return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i], v.trim()])));
+  const head=rows.shift();
+  return rows.map(r=>Object.fromEntries(r.map((v,i)=>[head[i],v.trim()])));
 }
 
-/* ==========================================================
-   CSV 読み込み
-   ========================================================== */
-const CSV =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
+/* ---------- CSV 読み込み ---------- */
+const CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vTiay6JSNWqeAIgge5AocJfyC3n_HsA-HhI1NiiDeQZ0KD1IXN9mCLMTjMqv4T-r32OUQR0cPAxauUV/pub?gid=0&single=true&output=csv";
+fetch(CSV+'&t='+Date.now())
+  .then(r=>r.text()).then(t=>draw(csv2json(t)))
+  .catch(e=>console.error('CSV 読み込み失敗',e));
 
-fetch(CSV + "&t=" + Date.now())
-  .then(r => r.text())
-  .then(t => draw(csv2json(t)))
-  .catch(e => console.error("CSV 読み込み失敗", e));
-
-/* ==========================================================
-   本体描画
-   ========================================================== */
+/* ---------- 描画本体 ---------- */
 function draw(data){
-  /* ---------- 1. パレット ---------- */
-  const cats = [...new Set(data.map(r => r.Category))];
-  const col  = ['#ff1493','#14FF82','#880800','#ffff00',
-                '#0000ff','#660099','#ff7f50','#ffa500'];
-  const catCol = Object.fromEntries(cats.map((c,i)=>[c, col[i % col.length]]));
+  /* 1. カテゴリ → 色 */
+  const cats=[...new Set(data.map(r=>r.Category))];
+  const col=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
+  const catCol=Object.fromEntries(cats.map((c,i)=>[c,col[i%col.length]]));
 
-  /* ---------- 2. 凡例 ---------- */
-  const leg = document.getElementById("legend");
+  /* 2. 凡例 */
+  const leg=document.getElementById('legend');
   cats.forEach(c=>{
-    const d = document.createElement("div");
-    d.style.display = "flex";
-    d.style.alignItems = "center";
-    d.innerHTML = `<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
+    const d=document.createElement('div');
+    d.style.display='flex';
+    d.style.alignItems='center';
+    d.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
     leg.appendChild(d);
   });
 
-  /* ---------- 3. 年目盛とグリッド ---------- */
-  const ys   = document.getElementById("years");
-  const P    = +getComputedStyle(document.documentElement).getPropertyValue("--PITCH");
-  const X0   = +getComputedStyle(document.documentElement).getPropertyValue("--X0");
-  const FROM = 1985;
-  const TO   = Math.max(...data.map(r => +r.End || +r.Start), new Date().getFullYear() + 1);
-
-  for(let y = FROM; y <= TO; y++){
-    const x = X0 + (y - FROM) * P;
+  /* 3. 年ラベル & グリッド */
+  const ys=document.getElementById('years');
+  const P =+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
+  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
+  const FROM=1985;
+  const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
+  for(let y=FROM;y<=TO;y++){
+    const x=X0+(y-FROM)*P;
+    /* 上下 1 ペア */
     ['top','bottom'].forEach(pos=>{
-      const e = document.createElement('div');
-      e.className = 'year';
-      e.style.left = `${x}px`;
-      if (pos === 'top'){
-        e.style.top = '-32px';        /* --- 余白調整 --- */
-      } else {
-        e.style.bottom = '-36px';
-      }
-      e.innerHTML = `<span>${y}</span>`;
+      const e=document.createElement('div');
+      e.className='year '+pos;
+      e.style.left=`${x}px`;
+      e.innerHTML=`<span>${y}</span>`;
       ys.appendChild(e);
     });
   }
 
-  /* ---------- 4. バー ---------- */
-  const bars   = document.getElementById("bars");
-  const LEG_H  = +getComputedStyle(document.documentElement).getPropertyValue("--LEGEND-H");
-  const ROW_H  = +getComputedStyle(document.documentElement).getPropertyValue("--ROW-H");
-  const GAP    = +getComputedStyle(document.documentElement).getPropertyValue("--ROW-GAP");
+  /* 4. バー */
+  const bars=document.getElementById('bars');
+  const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
+  const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
+  const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
 
-  data.sort((a,b)=> +a.Start - +b.Start || (+a.End||+a.Start) - (+b.End||+b.Start));
-  const total = data.length;
+  data.sort((a,b)=>+a.Start-+b.Start||(+a.End||+a.Start)-(+b.End||+b.Start));
+  const total=data.length;
 
   data.forEach((r,i)=>{
-    const s     = +r.Start,
-          e     = +r.End || s,
-          left  = X0 + (s - FROM) * P,
-          width = Math.max(((e - s) || 1) * P, 4),
-          top   = LEG_H + (total - 1 - i) * (ROW_H + GAP);
+    const s=+r.Start, e=+r.End||s;
+    const left =X0+(s-FROM)*P;
+    const width=Math.max((e-s||1)*P,4);
+    const top  =LEG_H+(total-1-i)*(ROW_H+GAP);
 
-    const box = document.createElement("div");
-    box.className = "bar-box";
-    box.style.cssText = `left:${left}px;top:${top}px;width:${width}px`;
+    const box=document.createElement('div');
+    box.className='bar-box';
+    box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
-    box.innerHTML = `
-      <a class="lbl" href="${r.Link || '#'}" target="_blank"
-         ${r.TooltipImg ? `data-img="${r.TooltipImg}"` : ''}>${r.Title}</a>
-      <a class="bar" href="${r.Link || '#'}" target="_blank"
+    box.innerHTML=`
+      <a class="lbl" href="${r.Link||'#'}" target="_blank"
+         ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
+      <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>`;
     bars.appendChild(box);
   });
 
-  document.getElementById("canvas").style.height =
-    LEG_H + total * (ROW_H + GAP) + "px";
+  document.getElementById('canvas').style.height =
+      LEG_H + total*(ROW_H+GAP) + 'px';
 
-  /* ---------- 5. ホバー時プレビュー ---------- */
-  const preview = document.getElementById("preview");
-  bars.addEventListener('mouseover', e=>{
-    const lbl = e.target.closest('.lbl');
-    if(!lbl || !lbl.dataset.img) return;
-
-    preview.innerHTML = `<img src="${lbl.dataset.img}" loading="lazy">`;
-    preview.style.display = 'block';
-
-    const rect = lbl.getBoundingClientRect();
-    const offset = 10;
-    let left = rect.right + offset;
-    let top  = rect.top;
-    if(left + preview.offsetWidth > window.innerWidth - 10){
-      left = window.innerWidth - preview.offsetWidth - 10;
-    }
-    if(top + preview.offsetHeight > window.innerHeight - 10){
-      top = window.innerHeight - preview.offsetHeight - 10;
-    }
-    preview.style.left = left + 'px';
-    preview.style.top  = top  + 'px';
+  /* 5. プレビュー */
+  const preview=document.getElementById('preview');
+  bars.addEventListener('mouseover',e=>{
+    const lbl=e.target.closest('.lbl');
+    if(!lbl||!lbl.dataset.img) return;
+    preview.innerHTML=`<img src="${lbl.dataset.img}" loading="lazy">`;
+    preview.style.display='block';
+    const rect=lbl.getBoundingClientRect(), offset=10;
+    let left=rect.right+offset, top=rect.top;
+    if(left+preview.offsetWidth>window.innerWidth-10)
+      left=window.innerWidth-preview.offsetWidth-10;
+    if(top+preview.offsetHeight>window.innerHeight-10)
+      top=window.innerHeight-preview.offsetHeight-10;
+    preview.style.left=left+'px'; preview.style.top=top+'px';
   });
-  bars.addEventListener('mouseout', e=>{
-    const lbl = e.target.closest('.lbl');
-    if(!lbl) return;
-    if(!preview.contains(e.relatedTarget)){
-      preview.style.display = 'none';
-    }
+  bars.addEventListener('mouseout',e=>{
+    if(!e.target.closest('.lbl')) return;
+    if(!preview.contains(e.relatedTarget))
+      preview.style.display='none';
   });
 
-  /* ---------- 6. 親（WordPress）へ高さ通知 ---------- */
-  sendHeight();                 // 初回
+  /* 6. 親へ高さを通知 */
+  sendHeight();
 }
 
-/* ==========================================================
-   親ページへ高さを届ける postMessage
-   ========================================================== */
+/* ---------- 高さ通知 (postMessage) ---------- */
 function sendHeight(){
-  const h = document.documentElement.scrollHeight || document.body.scrollHeight;
-  if (parent && parent.postMessage){
-    parent.postMessage({type:'timelineHeight', height:h}, '*');
+  const h=document.documentElement.scrollHeight||document.body.scrollHeight;
+  if(parent&&parent.postMessage){
+    parent.postMessage({type:'timelineHeight',height:h},'*');
   }
 }
-window.addEventListener('load',   sendHeight);
-window.addEventListener('resize', sendHeight);
+window.addEventListener('load',sendHeight);
+window.addEventListener('resize',sendHeight);
 </script>
 </body>
 </html>
-<!-- =========  /timeline.html ========= -->
+<!-- ========= /timeline.html ========= -->
