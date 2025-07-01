@@ -1,10 +1,10 @@
-<!-- =========  timeline.html (2025‑07‑改訂版)  ========= -->
+<!-- =========  timeline.html (v2025-07-grid-elem)  ========= -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Naoko Tosa Timeline</title>
+<title>Naoko Tosa Timeline</title>
 
 <style>
 /* --- reset --- */
@@ -16,7 +16,7 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 :root{
   --W:1060;                 /* タイムライン論理幅 */
   --PITCH:25;               /* 1 年 = 25px        */
-  --X0:0;                  /* 1985 年の X 座標   */
+  --X0:0;                   /* 1985 年の X 座標   */
   --LEGEND-H:140;           /* 凡例高さ           */
   --ROW-H:20; --ROW-GAP:6;  /* バー高さ & 行間    */
 }
@@ -36,20 +36,19 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   position:relative;
   width:calc(var(--W)*1px);
   margin:0 auto;
-  padding:80px 0 70px;            /* ← 上下余白を十分確保 */
-  padding-top:110px;   /* ← 80px → 110px に増量（他の padding はそのまま） */
+  padding:110px 0 70px;          /* 上側余白を十分確保 */
   transform-origin:top center;
   transform:scaleX(1) scaleY(1);
 }
 
 /* ---------- モバイル専用 ---------- */
 @media (max-width:767.98px){
-  #canvas{ transform:none; }               /* 既に入れてある行 */
+  #canvas{ transform:none; }
   #wrapper{
     overflow-x:auto;
-    overflow-y:auto;     /* ← 追加：縦もスクロール可にする */
-    max-height:90vh;     /* ← 追加：iframe 高さと合わせる（任意） */
-    -webkit-overflow-scrolling: auto;  /* ← 慣性オフで軸ロック回避 */
+    overflow-y:auto;
+    max-height:90vh;
+    -webkit-overflow-scrolling:auto; /* 慣性オフで軸ロック回避 */
   }
   #legend{
     position:static;
@@ -58,28 +57,27 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   }
 }
 
+/* --- grid（縦線を要素で描画） --- */
+#grid{
+  position:absolute; inset:0;
+  pointer-events:none;
+  z-index:0;
+}
+.vline{
+  position:absolute;
+  top:0; bottom:0;
+  width:1px;
+  background:#444;
+}
 
-/* --- grid & year labels --- */
-.grid{
-  position:absolute; inset:0; pointer-events:none; z-index:0;
-}
-.grid::before{
-  content:"";
-  display:block; height:100%;
-  background-image:repeating-linear-gradient(
-     to right,#444 0,#444 1px,transparent 1px,
-     transparent calc(var(--PITCH)*1px));
-  background-position:calc(var(--X0)*1px) 0;
-}
+/* --- year labels --- */
 .year{
   position:absolute;
   font-size:9pt;
   transform:translateX(-50%);
 }
-.year.top{
-  top:14px;            /* ← 数 px 動かしながら好みで微調整可 */
-}
-.year.bottom{ bottom:-34px; }     /* 余白確保のため少し下げる */
+.year.top{    top:14px; }
+.year.bottom{ bottom:-34px; }
 .year span{
   display:inline-block;
   transform:rotate(-70deg);
@@ -88,8 +86,7 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 
 /* --- legend --- */
 #legend{
-  position:fixed;
-  top:1rem; left:1rem; z-index:9999;
+  position:fixed; top:1rem; left:1rem; z-index:9999;
   display:flex; flex-direction:column; gap:.4rem;
   font-size:9pt; padding:1rem 1.2rem;
   background:#111e; backdrop-filter:blur(4px);
@@ -101,17 +98,16 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 .bar-box{position:absolute;font-size:9pt}
 .bar{display:block;height:10px;border:1px solid #000}
 .lbl{
-  position:absolute;
-  right:calc(100% + 8px); top:-1px;
+  position:absolute; top:-1px;
   white-space:nowrap; color:#fff;
   text-decoration:underline .08em transparent;
   transition:text-decoration-color .2s;
 }
-.lbl.left { right:calc(100% + 8px); }   /* ←バー左側（従来）*/
-.lbl.right{ left :calc(100% + 8px); }   /* ←バー右側（新規）*/
+.lbl.left { right:calc(100% + 8px); }   /* 2006 年以降 */
+.lbl.right{ left :calc(100% + 8px); }   /* 2005 年以前 */
 .lbl:hover{ text-decoration-color:currentColor }
 
-/* --- preview on hover --- */
+/* --- preview on hover/touch --- */
 #preview{
   display:none; position:fixed; z-index:10000;
   pointer-events:none; max-width:400px;
@@ -127,10 +123,9 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 </head>
 
 <body>
-
 <div id="wrapper">
   <div id="canvas">
-    <div class="grid"></div>
+    <div id="grid"></div>    <!-- 縦線用 -->
     <div id="years"></div>   <!-- 年ラベル -->
     <div id="bars"></div>    <!-- イベントバー -->
   </div>
@@ -173,21 +168,29 @@ function draw(data){
   const leg=document.getElementById('legend');
   cats.forEach(c=>{
     const d=document.createElement('div');
-    d.style.display='flex';
-    d.style.alignItems='center';
+    d.style.display='flex'; d.style.alignItems='center';
     d.innerHTML=`<span class="leg-bar" style="background:${catCol[c]}"></span>${c}`;
     leg.appendChild(d);
   });
 
-  /* 3. 年ラベル & グリッド */
-  const ys=document.getElementById('years');
-  const P =+getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
-  const X0=+getComputedStyle(document.documentElement).getPropertyValue('--X0');
-  const FROM=1985;
-  const TO=Math.max(...data.map(r=>+r.End||+r.Start),new Date().getFullYear()+1);
+  /* 3. 年ラベル & 縦線 */
+  const ys   = document.getElementById('years');
+  const grid = document.getElementById('grid');
+  const P    = +getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
+  const X0   = +getComputedStyle(document.documentElement).getPropertyValue('--X0');
+  const FROM = 1985;
+  const TO   = Math.max(...data.map(r=>+r.End||+r.Start), new Date().getFullYear()+1);
+
   for(let y=FROM;y<=TO;y++){
-    const x=X0+(y-FROM)*P;
-    /* 上下 1 ペア */
+    const x = X0 + (y-FROM)*P;
+
+    /* 縦線 */
+    const line=document.createElement('div');
+    line.className='vline';
+    line.style.left=`${x}px`;
+    grid.appendChild(line);
+
+    /* 年ラベル上下 */
     ['top','bottom'].forEach(pos=>{
       const e=document.createElement('div');
       e.className='year '+pos;
@@ -198,25 +201,25 @@ function draw(data){
   }
 
   /* 4. バー */
-  const bars=document.getElementById('bars');
-  const LEG_H=+getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
-  const ROW_H=+getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
-  const GAP  =+getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
+  const bars  = document.getElementById('bars');
+  const LEG_H = +getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
+  const ROW_H = +getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
+  const GAP   = +getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
 
   data.sort((a,b)=>+a.Start-+b.Start||(+a.End||+a.Start)-(+b.End||+b.Start));
   const total=data.length;
 
   data.forEach((r,i)=>{
-    const s=+r.Start, e=+r.End||s;
-    const left =X0+(s-FROM)*P;
-    const width=Math.max((e-s||1)*P,4);
-    const top  =LEG_H+(total-1-i)*(ROW_H+GAP);
+    const s = +r.Start, e = +r.End||s;
+    const left  = X0+(s-FROM)*P;
+    const width = Math.max((e-s||1)*P,4);
+    const top   = LEG_H+(total-1-i)*(ROW_H+GAP);
 
     const box=document.createElement('div');
     box.className='bar-box';
     box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
-    const lblPos = (s < 2006) ? 'right' : 'left';   // ★ 2005年以前→右側
+    const lblPos = (s < 2006) ? 'right' : 'left';
     box.innerHTML = `
       <a class="lbl ${lblPos}" href="${r.Link||'#'}" target="_blank"
          ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
@@ -228,7 +231,7 @@ function draw(data){
   document.getElementById('canvas').style.height =
       LEG_H + total*(ROW_H+GAP) + 'px';
 
-  /* 5. プレビュー */
+  /* 5. プレビュー（PC hover） */
   const preview=document.getElementById('preview');
   bars.addEventListener('mouseover',e=>{
     const lbl=e.target.closest('.lbl');
@@ -245,62 +248,43 @@ function draw(data){
   });
   bars.addEventListener('mouseout',e=>{
     if(!e.target.closest('.lbl')) return;
-    if(!preview.contains(e.relatedTarget))
-      preview.style.display='none';
+    if(!preview.contains(e.relatedTarget)) preview.style.display='none';
   });
-  /* -----------------------------------------------------------------
-       モバイル：1 回目タップでプレビュー、2 回目タップでリンク遷移
-    ----------------------------------------------------------------- */
-    let tapTimer = null;   // ダブルタップ判定用
-    bars.addEventListener('touchstart', e => {
-      const lbl = e.target.closest('.lbl');
-      if (!lbl || !lbl.dataset.img) return;
-    
-      // ----- 1 回目タップ：プレビュー表示して遷移を抑止 -----
-      if (!lbl.dataset.previewed){
-        e.preventDefault();           // ← リンク遷移を止める
-        lbl.dataset.previewed = '1';  // フラグを立てる
-        preview.innerHTML = `<img src="${lbl.dataset.img}" loading="lazy">`;
-        preview.style.display = 'block';
-    
-        /* 位置計算（指が隠さないよう少し右上へ） */
-        const touch = e.touches[0];
-        const offset = 12;
-        let left = touch.clientX + offset;
-        let top  = touch.clientY  - 80;     // 指より上へ
-        if (left + preview.offsetWidth > window.innerWidth - 10)
-          left = window.innerWidth - preview.offsetWidth - 10;
-        if (top  < 10) top = 10;
-        preview.style.left = left + 'px';
-        preview.style.top  = top  + 'px';
-    
-        // 3 秒後に自動クローズ & フラグ解除
-        clearTimeout(tapTimer);
-        tapTimer = setTimeout(()=>{
-          preview.style.display = 'none';
-          delete lbl.dataset.previewed;
-        }, 3000);
-      }
-      // ----- 2 回目タップ：プレビュー消してそのままリンクへ -----
-    }, {passive:false});   // <─ preventDefault を効かせるため
-    
-    bars.addEventListener('click', e => {
-      const lbl = e.target.closest('.lbl');
-      if (!lbl || !lbl.dataset.img) return;
-    
-      // 1 回目で previewed が付いていたら、ここでリンク遷移許可
-      if (lbl.dataset.previewed){
-        preview.style.display = 'none';
-        clearTimeout(tapTimer);
+
+  /* 5-b. プレビュー（モバイル 1st タップ） */
+  let tapTimer=null;
+  bars.addEventListener('touchstart',e=>{
+    const lbl=e.target.closest('.lbl');
+    if(!lbl||!lbl.dataset.img) return;
+    if(!lbl.dataset.previewed){
+      e.preventDefault();
+      lbl.dataset.previewed='1';
+      preview.innerHTML=`<img src="${lbl.dataset.img}" loading="lazy">`;
+      preview.style.display='block';
+      const touch=e.touches[0], offset=12;
+      let left=touch.clientX+offset, top=touch.clientY-80;
+      if(left+preview.offsetWidth>window.innerWidth-10)
+        left=window.innerWidth-preview.offsetWidth-10;
+      if(top<10) top=10;
+      preview.style.left=left+'px';
+      preview.style.top =top +'px';
+      clearTimeout(tapTimer);
+      tapTimer=setTimeout(()=>{
+        preview.style.display='none';
         delete lbl.dataset.previewed;
-        return;   // 通常の <a> click 処理に任せる
-      }
-      // PC など通常環境の click は無変更
-    }, true);  // capture フェーズで実行
+      },3000);
+    }
+  },{passive:false});
+  bars.addEventListener('click',e=>{
+    const lbl=e.target.closest('.lbl');
+    if(lbl&&lbl.dataset.previewed){
+      preview.style.display='none';
+      clearTimeout(tapTimer);
+      delete lbl.dataset.previewed;
+    }
+  },true);
 
-  
-
-  /* 6. 親へ高さを通知 */
+  /* 6. 親へ高さ通知 */
   sendHeight();
 }
 
