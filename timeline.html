@@ -49,6 +49,7 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
     overflow-x:auto;
     overflow-y:auto;     /* ← 追加：縦もスクロール可にする */
     max-height:90vh;     /* ← 追加：iframe 高さと合わせる（任意） */
+    -webkit-overflow-scrolling: auto;  /* ← 慣性オフで軸ロック回避 */
   }
   #legend{
     position:static;
