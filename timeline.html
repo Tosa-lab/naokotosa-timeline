@@ -44,15 +44,19 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 
 /* ---------- モバイル専用 ---------- */
 @media (max-width:767.98px){
-  #canvas{ transform:none; }      /* ← scaleX を解除 (タッチ座標ずれ対策) */
+  #canvas{ transform:none; }               /* 既に入れてある行 */
+  #wrapper{
+    overflow-x:auto;
+    overflow-y:auto;     /* ← 追加：縦もスクロール可にする */
+    max-height:90vh;     /* ← 追加：iframe 高さと合わせる（任意） */
+  }
   #legend{
     position:static;
     margin:0.5rem auto 1rem;
-    flex-direction:row;
-    flex-wrap:wrap;
-    justify-content:center;
+    flex-direction:row; flex-wrap:wrap; justify-content:center;
   }
 }
+
 
 /* --- grid & year labels --- */
 .grid{
