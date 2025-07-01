@@ -102,6 +102,8 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
   text-decoration:underline .08em transparent;
   transition:text-decoration-color .2s;
 }
+.lbl.left { right:calc(100% + 8px); }   /* ←バー左側（従来）*/
+.lbl.right{ left :calc(100% + 8px); }   /* ←バー右側（新規）*/
 .lbl:hover{ text-decoration-color:currentColor }
 
 /* --- preview on hover --- */
@@ -209,8 +211,9 @@ function draw(data){
     box.className='bar-box';
     box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
 
-    box.innerHTML=`
-      <a class="lbl" href="${r.Link||'#'}" target="_blank"
+    const lblPos = (s < 2006) ? 'right' : 'left';   // ★ 2005年以前→右側
+    box.innerHTML = `
+      <a class="lbl ${lblPos}" href="${r.Link||'#'}" target="_blank"
          ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
       <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>`;
