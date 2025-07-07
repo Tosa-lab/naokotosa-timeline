@@ -1,4 +1,4 @@
-<!-- =========  timeline.html (v2025-07-grid-elem)  ========= -->
+<!-- =========  timeline.html (full‑revised, 2025‑07‑07)  ========= -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -116,6 +116,14 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 }
 #preview img{width:100%;display:block}
 
+/* === 画像右上の年バッジ === */
+.year-badge{
+  position:absolute; top:6px; right:8px;
+  padding:2px 6px; font-size:10pt; font-weight:600;
+  background:#000b; color:#fff; border-radius:4px;
+  pointer-events:none;
+}
+
 /* --- WebKit scrollbar --- */
 ::-webkit-scrollbar{height:8px}
 ::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
@@ -159,12 +167,15 @@ fetch(CSV+'&t='+Date.now())
 
 /* ---------- 描画本体 ---------- */
 function draw(data){
-  /* 1. カテゴリ → 色 */
+  /* 1. IO 列でフィルタ（IO が O の行は描画しない） */
+  data = data.filter(r => !r.IO || r.IO.toUpperCase() === 'I');
+
+  /* 2. カテゴリ → 色 */
   const cats=[...new Set(data.map(r=>r.Category))];
   const col=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
   const catCol=Object.fromEntries(cats.map((c,i)=>[c,col[i%col.length]]));
 
-  /* 2. 凡例 */
+  /* 3. 凡例 */
   const leg=document.getElementById('legend');
   cats.forEach(c=>{
     const d=document.createElement('div');
@@ -173,7 +184,7 @@ function draw(data){
     leg.appendChild(d);
   });
 
-  /* 3. 年ラベル & 縦線 */
+  /* 4. 年ラベル & 縦線 */
   const ys   = document.getElementById('years');
   const grid = document.getElementById('grid');
   const P    = +getComputedStyle(document.documentElement).getPropertyValue('--PITCH');
@@ -200,7 +211,7 @@ function draw(data){
     });
   }
 
-  /* 4. バー */
+  /* 5. バー */
   const bars  = document.getElementById('bars');
   const LEG_H = +getComputedStyle(document.documentElement).getPropertyValue('--LEGEND-H');
   const ROW_H = +getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
@@ -222,6 +233,7 @@ function draw(data){
     const lblPos = (s < 2006) ? 'right' : 'left';
     box.innerHTML = `
       <a class="lbl ${lblPos}" href="${r.Link||'#'}" target="_blank"
+         data-year="${s}"
          ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
       <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>`;
@@ -231,12 +243,15 @@ function draw(data){
   document.getElementById('canvas').style.height =
       LEG_H + total*(ROW_H+GAP) + 'px';
 
-  /* 5. プレビュー（PC hover） */
+  /* 6. プレビュー（PC hover） */
   const preview=document.getElementById('preview');
   bars.addEventListener('mouseover',e=>{
     const lbl=e.target.closest('.lbl');
     if(!lbl||!lbl.dataset.img) return;
-    preview.innerHTML=`<img src="${lbl.dataset.img}" loading="lazy">`;
+
+    preview.innerHTML=`
+      <img src="${lbl.dataset.img}" loading="lazy">
+      <div class="year-badge">${lbl.dataset.year}</div>`;
     preview.style.display='block';
     const rect=lbl.getBoundingClientRect(), offset=10;
     let left=rect.right+offset, top=rect.top;
@@ -251,23 +266,27 @@ function draw(data){
     if(!preview.contains(e.relatedTarget)) preview.style.display='none';
   });
 
-  /* 5-b. プレビュー（モバイル 1st タップ） */
+  /* 6‑b. プレビュー（モバイル 1st タップ） */
   let tapTimer=null;
   bars.addEventListener('touchstart',e=>{
     const lbl=e.target.closest('.lbl');
     if(!lbl||!lbl.dataset.img) return;
+
     if(!lbl.dataset.previewed){
       e.preventDefault();
       lbl.dataset.previewed='1';
-      preview.innerHTML=`<img src="${lbl.dataset.img}" loading="lazy">`;
+
+      preview.innerHTML=`
+        <img src="${lbl.dataset.img}" loading="lazy">
+        <div class="year-badge">${lbl.dataset.year}</div>`;
       preview.style.display='block';
       const touch=e.touches[0], offset=12;
       let left=touch.clientX+offset, top=touch.clientY-80;
       if(left+preview.offsetWidth>window.innerWidth-10)
         left=window.innerWidth-preview.offsetWidth-10;
       if(top<10) top=10;
-      preview.style.left=left+'px';
-      preview.style.top =top +'px';
+      preview.style.left=left+'px'; preview.style.top=top+'px';
+
       clearTimeout(tapTimer);
       tapTimer=setTimeout(()=>{
         preview.style.display='none';
@@ -284,13 +303,14 @@ function draw(data){
     }
   },true);
 
-  /* 6. 親へ高さ通知 */
+  /* 7. 親へ高さ通知 */
   sendHeight();
 }
 
 /* ---------- 高さ通知 (postMessage) ---------- */
 function sendHeight(){
-  const h=document.documentElement.scrollHeight||document.body.scrollHeight;
+  const canvas=document.getElementById('canvas');
+  const h=canvas.getBoundingClientRect().height;    /* キャンバス実寸 */
   if(parent&&parent.postMessage){
     parent.postMessage({type:'timelineHeight',height:h},'*');
   }
