@@ -309,12 +309,13 @@ function draw(data){
 
 /* ---------- 高さ通知 (postMessage) ---------- */
 function sendHeight(){
-  /* ドキュメントの総高さをそのまま送る方が確実 */
-  const h = Math.ceil(document.documentElement.scrollHeight);   // ← 変更
+  const extra = 34;  // 年ラベルぶんの固定マージン
+  const h = Math.ceil(document.documentElement.scrollHeight + extra);
   if (parent && parent.postMessage){
-    parent.postMessage({type:'timelineHeight',height:h},'*');
+    parent.postMessage({type:'timelineHeight', height: h}, '*');
   }
 }
+
 
 window.addEventListener('load',sendHeight);
 window.addEventListener('resize',sendHeight);
