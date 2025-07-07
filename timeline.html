@@ -234,6 +234,7 @@ function draw(data){
     box.innerHTML = `
       <a class="lbl ${lblPos}" href="${r.Link||'#'}" target="_blank"
          data-year="${s}"
+         data-color="${catCol[r.Category]}"           /* ← 追加 */
          ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
       <a class="bar" href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>`;
@@ -249,9 +250,10 @@ function draw(data){
     const lbl=e.target.closest('.lbl');
     if(!lbl||!lbl.dataset.img) return;
 
-    preview.innerHTML=`
+    preview.innerHTML = `
       <img src="${lbl.dataset.img}" loading="lazy">
-      <div class="year-badge">${lbl.dataset.year}</div>`;
+      <div class="year-badge"
+           style="color:${lbl.dataset.color}">${lbl.dataset.year}</div>`;  /* ← 変更 */
     preview.style.display='block';
     const rect=lbl.getBoundingClientRect(), offset=10;
     let left=rect.right+offset, top=rect.top;
@@ -276,9 +278,10 @@ function draw(data){
       e.preventDefault();
       lbl.dataset.previewed='1';
 
-      preview.innerHTML=`
-        <img src="${lbl.dataset.img}" loading="lazy">
-        <div class="year-badge">${lbl.dataset.year}</div>`;
+    preview.innerHTML = `
+      <img src="${lbl.dataset.img}" loading="lazy">
+      <div class="year-badge"
+           style="color:${lbl.dataset.color}">${lbl.dataset.year}</div>`;  /* ← 同じく */
       preview.style.display='block';
       const touch=e.touches[0], offset=12;
       let left=touch.clientX+offset, top=touch.clientY-80;
