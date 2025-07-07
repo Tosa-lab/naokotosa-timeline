@@ -311,19 +311,20 @@ function draw(data){
 }
 
 /* ---------- 高さ通知 (postMessage) ---------- */
-let lastSentHeight = 0;                            // 直前に送った高さを保持
+let lastSentHeight = 0;
 
 function sendHeight(){
-  const canvas = document.getElementById('canvas');
-  const extra  = 34;                               // 年ラベルぶん固定
-  const h      = Math.ceil(canvas.getBoundingClientRect().height + extra);
-
-  /* 高さが変わったときだけ親へ通知 */
-  if (Math.abs(h - lastSentHeight) > 1 && parent && parent.postMessage){
+  const h = Math.ceil(document.documentElement.scrollHeight);   // ← ① ドキュメント全体
+  if (h !== lastSentHeight && parent && parent.postMessage){
     parent.postMessage({type:'timelineHeight', height: h}, '*');
     lastSentHeight = h;
   }
 }
+
+/* ---------- 監視を追加 ---------- */
+const ro = new ResizeObserver(()=>sendHeight());  // ← ② 追加
+ro.observe(document.documentElement);             // ← ② 追加
+
 
 
 
