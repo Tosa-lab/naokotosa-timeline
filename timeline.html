@@ -161,7 +161,7 @@ fetch(CSV+'&t='+Date.now())
 function draw(data){
   /* 1. カテゴリ → 色 */
   const cats=[...new Set(data.map(r=>r.Category))];
-  const col=['#ffff00','#14FF82','#ff1493','#ff0000','#ffa500'];
+  const col=['#ff1493','#14FF82','#880800','#ffff00','#0000ff','#660099','#ff7f50','#ffa500'];
   const catCol=Object.fromEntries(cats.map((c,i)=>[c,col[i%col.length]]));
 
   /* 2. 凡例 */
