@@ -308,13 +308,20 @@ function draw(data){
 }
 
 /* ---------- 高さ通知 (postMessage) ---------- */
+let lastSentHeight = 0;                            // 直前に送った高さを保持
+
 function sendHeight(){
-  const extra = 34;  // 年ラベルぶんの固定マージン
-  const h = Math.ceil(document.documentElement.scrollHeight + extra);
-  if (parent && parent.postMessage){
+  const canvas = document.getElementById('canvas');
+  const extra  = 34;                               // 年ラベルぶん固定
+  const h      = Math.ceil(canvas.getBoundingClientRect().height + extra);
+
+  /* 高さが変わったときだけ親へ通知 */
+  if (Math.abs(h - lastSentHeight) > 1 && parent && parent.postMessage){
     parent.postMessage({type:'timelineHeight', height: h}, '*');
+    lastSentHeight = h;
   }
 }
+
 
 
 window.addEventListener('load',sendHeight);
