@@ -309,12 +309,13 @@ function draw(data){
 
 /* ---------- 高さ通知 (postMessage) ---------- */
 function sendHeight(){
-  const canvas=document.getElementById('canvas');
-  const h=canvas.getBoundingClientRect().height;    /* キャンバス実寸 */
-  if(parent&&parent.postMessage){
+  /* ドキュメントの総高さをそのまま送る方が確実 */
+  const h = Math.ceil(document.documentElement.scrollHeight);   // ← 変更
+  if (parent && parent.postMessage){
     parent.postMessage({type:'timelineHeight',height:h},'*');
   }
 }
+
 window.addEventListener('load',sendHeight);
 window.addEventListener('resize',sendHeight);
 </script>
