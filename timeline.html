@@ -310,7 +310,7 @@ function draw(data){
 /* ---------- 高さ通知 (postMessage) ---------- */
 function sendHeight(){
   /* ドキュメントの総高さをそのまま送る方が確実 */
-  const h = Math.ceil(document.documentElement.scrollHeight);   // ← 変更
+  const h = Math.ceil(document.documentElement.scrollHeight) + 34;   // ← 変更
   if (parent && parent.postMessage){
     parent.postMessage({type:'timelineHeight',height:h},'*');
   }
