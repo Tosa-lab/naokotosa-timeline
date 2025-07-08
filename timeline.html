@@ -231,7 +231,7 @@ function draw(data){
     const left  = X0+(s-FROM)*P;
     const width = Math.max((e-s||1)*P,4);
     const top   = LEG_H + i * (ROW_H + GAP);
-    const isWork = (r.Category === 'Work');             // ← 追加
+    const isWork = (r.Category === 'Works');             // ← 追加
     const box=document.createElement('div');
     box.className='bar-box';
     box.style.cssText=`left:${left}px;top:${top}px;width:${width}px`;
