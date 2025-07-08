@@ -172,7 +172,7 @@ function draw(data){
 
   /* 2. カテゴリ → 色 */
   const cats=[...new Set(data.map(r=>r.Category))];
-  const col=['#ffff00','#14FF82','#ff1493','#880800','#ffff00','#660099','#ff7f50','#ffa500'];
+  const col=['#ffff00','#14FF82','#ff1493','#3874e3','#c52ec6','#ff7f50','#c4c173'];
   const catCol=Object.fromEntries(cats.map((c,i)=>[c,col[i%col.length]]));
 
   /* 3. 凡例 */
@@ -217,14 +217,13 @@ function draw(data){
   const ROW_H = +getComputedStyle(document.documentElement).getPropertyValue('--ROW-H');
   const GAP   = +getComputedStyle(document.documentElement).getPropertyValue('--ROW-GAP');
 
-  data.sort((a,b)=>+a.Start-+b.Start||(+a.End||+a.Start)-(+b.End||+b.Start));
   const total=data.length;
 
   data.forEach((r,i)=>{
     const s = +r.Start, e = +r.End||s;
     const left  = X0+(s-FROM)*P;
     const width = Math.max((e-s||1)*P,4);
-    const top   = LEG_H+(total-1-i)*(ROW_H+GAP);
+    const top   = LEG_H + i * (ROW_H + GAP);
 
     const box=document.createElement('div');
     box.className='bar-box';
