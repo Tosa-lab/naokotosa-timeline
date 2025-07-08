@@ -128,11 +128,9 @@ body{font-family:"Noto Sans JP",sans-serif;background:#111;color:#fff;line-heigh
 ::-webkit-scrollbar{height:8px}
 ::-webkit-scrollbar-thumb{background:#555;border-radius:4px}
 
-/* === Work カテゴリだけ強調表示 === */
-.work-bold { font-weight:700; }          /* リンクを太字に              */
-.work-bar  { height:14px; }              /* バーを 10→14px に拡大       */
-/* bar の高さを変えたら行の高さ変数も合わせて +4px すると揃います */
-:root{ --ROW-H:24; }                     /* 例: 10→14 に合わせ 20→24px */
+.work-bold { font-weight:700; }
+
+.italic-link { font-style:italic; }
 
 </style>
 </head>
@@ -238,11 +236,12 @@ function draw(data){
 
     const lblPos = (s < 2006) ? 'right' : 'left';
     box.innerHTML = `
-      <a class="lbl ${lblPos}${isWork?' work-bold':''}"      /* ← 変更 */
+      <a class="lbl ${lblPos}${isWork ? ' work-bold' : ' italic-link'}"   /* ★ */
+         href="${r.Link||'#'}" target="_blank"
          data-year="${s}"
-         data-color="${catCol[r.Category]}"           /* ← 追加 */
          ${r.TooltipImg?`data-img="${r.TooltipImg}"`:''}>${r.Title}</a>
-      <a class="bar${isWork?' work-bar':''}"                  /* ← 変更 */
+      <a class="bar"                                                /* ★ work-bar を除去 */
+         href="${r.Link||'#'}" target="_blank"
          style="background:${catCol[r.Category]};width:${width}px"></a>`;
     bars.appendChild(box);
   });
